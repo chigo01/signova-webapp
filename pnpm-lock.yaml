@@ -60,6 +60,9 @@ importers:
       typescript:
         specifier: ^5
         version: 5.9.3
+      wrangler:
+        specifier: ^4
+        version: 4.58.0
 
 packages:
 
