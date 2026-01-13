@@ -23,9 +23,10 @@ export function AuthForm({ type }: AuthFormProps) {
     setIsLoading(true);
 
     try {
-      const res = await fetch("http://localhost:3001/auth/send-otp", {
+      const res = await fetch("http://localhost:9000/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           email,
           name:
@@ -53,9 +54,10 @@ export function AuthForm({ type }: AuthFormProps) {
     setIsLoading(true);
 
     try {
-      const res = await fetch("http://localhost:3001/auth/verify-otp", {
+      const res = await fetch("http://localhost:9000/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, otp }),
       });
 
