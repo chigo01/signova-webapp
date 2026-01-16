@@ -10,9 +10,12 @@ const Page = () => {
     // Check auth status via server (httpOnly cookie can't be read client-side)
     const checkAuth = async () => {
       try {
-        const res = await fetch("http://localhost:9000/auth/check", {
-          credentials: "include",
-        });
+        const res = await fetch(
+          "https://signova-server.onrender.com/auth/check",
+          {
+            credentials: "include",
+          }
+        );
 
         if (res.ok) {
           router.replace("/dashboard");

@@ -23,18 +23,21 @@ export function AuthForm({ type }: AuthFormProps) {
     setIsLoading(true);
 
     try {
-      const res = await fetch("http://localhost:9000/auth/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          email,
-          name:
-            type === "register"
-              ? (document.getElementById("name") as HTMLInputElement)?.value
-              : undefined,
-        }),
-      });
+      const res = await fetch(
+        "https://signova-server.onrender.com/auth/send-otp",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            email,
+            name:
+              type === "register"
+                ? (document.getElementById("name") as HTMLInputElement)?.value
+                : undefined,
+          }),
+        }
+      );
 
       if (!res.ok) {
         throw new Error("Failed to send OTP");
@@ -54,12 +57,15 @@ export function AuthForm({ type }: AuthFormProps) {
     setIsLoading(true);
 
     try {
-      const res = await fetch("http://localhost:9000/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email, otp }),
-      });
+      const res = await fetch(
+        "https://signova-server.onrender.com/auth/verify-otp",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ email, otp }),
+        }
+      );
 
       if (!res.ok) {
         throw new Error("Invalid OTP");
