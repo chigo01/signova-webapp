@@ -1,6 +1,7 @@
 import { Signal } from "@/types/signal";
 
-const API_URL = "http://localhost:9000";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "https://signova-server.onrender.com";
 
 interface SignalsResponse {
   success: boolean;

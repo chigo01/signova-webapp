@@ -15,13 +15,14 @@ export default function DashboardLayout({
   useEffect(() => {
     // Check auth status via server (httpOnly cookie can't be read client-side)
     const checkAuth = async () => {
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL ||
+        "https://signova-server.onrender.com";
+
       try {
-        const res = await fetch(
-          "https://signova-server.onrender.com/auth/check",
-          {
-            credentials: "include",
-          }
-        );
+        const res = await fetch(`${API_URL}/auth/check`, {
+          credentials: "include",
+        });
 
         if (res.ok) {
           setIsAuthenticated(true);

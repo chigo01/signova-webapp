@@ -18,26 +18,26 @@ export function AuthForm({ type }: AuthFormProps) {
   const [email, setEmail] = React.useState("");
   const [otp, setOtp] = React.useState("");
 
+  const API_URL =
+    process.env.NEXT_PUBLIC_API_URL || "https://signova-server.onrender.com";
+
   async function onEmailSubmit(event: React.FormEvent) {
     event.preventDefault();
     setIsLoading(true);
 
     try {
-      const res = await fetch(
-        "https://signova-server.onrender.com/auth/send-otp",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            email,
-            name:
-              type === "register"
-                ? (document.getElementById("name") as HTMLInputElement)?.value
-                : undefined,
-          }),
-        }
-      );
+      const res = await fetch(`${API_URL}/auth/send-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          email,
+          name:
+            type === "register"
+              ? (document.getElementById("name") as HTMLInputElement)?.value
+              : undefined,
+        }),
+      });
 
       if (!res.ok) {
         throw new Error("Failed to send OTP");
@@ -57,15 +57,12 @@ export function AuthForm({ type }: AuthFormProps) {
     setIsLoading(true);
 
     try {
-      const res = await fetch(
-        "https://signova-server.onrender.com/auth/verify-otp",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ email, otp }),
-        }
-      );
+      const res = await fetch(`${API_URL}/auth/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, otp }),
+      });
 
       if (!res.ok) {
         throw new Error("Invalid OTP");
