@@ -95,3 +95,132 @@ export async function fetchSignalHistory(
 
   return res.json();
 }
+
+// FCS API Response Types
+interface FcsApiTickerData {
+  ticker: string;
+  update: number;
+  updateTime: string;
+  active: {
+    a: number; // ask
+    b: number; // bid
+    o: number; // open
+    h: number; // high
+    l: number; // low
+    c: number; // close
+    v: number | null; // volume
+    t: number; // timestamp
+    vw: number; // volume weighted
+    tm: string; // time string
+    ch: number; // change
+    chp: number; // change percent
+  };
+  previous: {
+    o: number;
+    h: number;
+    l: number;
+    c: number;
+    v: number | null;
+    t: number;
+    vw: number;
+    tm: string;
+    ch: number;
+    chp: number;
+  };
+}
+
+interface FcsApiResponse {
+  status: boolean;
+  code: number;
+  msg: string;
+  response: FcsApiTickerData[];
+  info: {
+    support_params: string;
+    filter_exchange: string;
+    type: string;
+    sub_type: string;
+    period: string;
+    merge: string;
+    sort_by: string;
+    total_rows: number;
+    pagination: object;
+    server_time: string;
+    credit_count: number;
+    file_read: string;
+    load_time: string;
+    process_time: string;
+    radis_used: boolean;
+    _t: string;
+  };
+}
+
+interface PairSignalResponse {
+  success: boolean;
+  pair: string;
+  cached: boolean;
+  cachedAt: string;
+  expiresAt: string;
+  usage: {
+    current: number;
+    limit: number;
+    warning: boolean;
+  };
+  signals: FcsApiResponse;
+}
+
+export interface ChartDataPoint {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
+export async function fetchPairSignals(pair: string): Promise<ChartDataPoint[]> {
+  try {
+    const res = await fetch(`${API_URL}/signals/pair/${pair}/signals`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to fetch pair signals: ${res.statusText}`);
+    }
+
+    const data: PairSignalResponse = await res.json();
+    
+    // Transform FCS API response to chart data format
+    // Get the first ticker (or you can aggregate all tickers)
+    const ticker = data.signals.response[0];
+    
+    if (!ticker) {
+      return [];
+    }
+
+    // Create chart data points from active and previous data
+    const chartData: ChartDataPoint[] = [
+      {
+        time: ticker.previous.tm.split(" ")[0], // Extract date
+        open: ticker.previous.o,
+        high: ticker.previous.h,
+        low: ticker.previous.l,
+        close: ticker.previous.c,
+      },
+      {
+        time: ticker.active.tm.split(" ")[0], // Extract date
+        open: ticker.active.o,
+        high: ticker.active.h,
+        low: ticker.active.l,
+        close: ticker.active.c,
+      },
+    ];
+
+    return chartData;
+  } catch (error) {
+    console.error("Error fetching pair signals:", error);
+    throw error;
+  }
+}

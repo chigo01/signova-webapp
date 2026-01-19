@@ -7,12 +7,14 @@ interface SignalsPanelProps {
   signals: Signal[];
   isLoading: boolean;
   onRefresh: () => void;
+  onSignalClick?: (pair: string) => void;
 }
 
 export function SignalsPanel({
   signals,
   isLoading,
   onRefresh,
+  onSignalClick,
 }: SignalsPanelProps) {
   if (isLoading && signals.length === 0) {
     return (
@@ -65,7 +67,11 @@ export function SignalsPanel({
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {signals.map((signal) => (
-          <SignalCard key={signal._id} signal={signal} />
+          <SignalCard 
+            key={signal._id} 
+            signal={signal} 
+            onClick={onSignalClick}
+          />
         ))}
       </div>
     </div>

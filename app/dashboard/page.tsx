@@ -3,44 +3,49 @@
 import { ChartComponent } from "@/components/charts/chart";
 import { SignalsPanel } from "@/components/dashboard/signals-panel";
 import { Button } from "@/components/ui/button";
-import { fetchApprovedSignals } from "@/lib/signals";
+import { fetchApprovedSignals, fetchPairSignals, ChartDataPoint } from "@/lib/signals";
 import { Signal } from "@/types/signal";
 import { ArrowLeft, Bell, Settings } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-// Mock data for the chart
-const MOCK_DATA = Array.from({ length: 100 }, (_, i) => {
-  const date = new Date();
-  date.setDate(date.getDate() - (100 - i));
-  const time = date.toISOString().split("T")[0];
-
-  // Simple random walk for mock data
-  const base = 1.08 + Math.sin(i / 10) * 0.02;
-  const vol = Math.random() * 0.005;
-  const open = base;
-  const close = base + (Math.random() - 0.5) * vol;
-  const high = Math.max(open, close) + Math.random() * vol;
-  const low = Math.min(open, close) - Math.random() * vol;
-
-  return { time, open, high, low, close };
-});
-
 export default function TraderFocusedPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [loadingChart, setLoadingChart] = useState(false);
+  const [currentPair, setCurrentPair] = useState<string>("");
+
+  const loadChartData = useCallback(async (pair: string) => {
+    try {
+      setLoadingChart(true);
+      setCurrentPair(pair);
+      const data = await fetchPairSignals(pair);
+      setChartData(data);
+    } catch (error) {
+      console.error("Failed to load chart data for", pair, error);
+      setChartData([]);
+    } finally {
+      setLoadingChart(false);
+    }
+  }, []);
 
   const loadSignals = useCallback(async () => {
     try {
       setIsLoading(true);
       const data = await fetchApprovedSignals();
       setSignals(data);
+      
+      // Load chart data for the first signal if available
+      if (data.length > 0) {
+        await loadChartData(data[0].pair);
+      }
     } catch (error) {
       console.error("Failed to load signals", error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [loadChartData]);
 
   useEffect(() => {
     loadSignals();
@@ -52,10 +57,12 @@ export default function TraderFocusedPage() {
       <header className="flex h-16 items-center justify-between border-b border-border px-6">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold">USDJPY</h1>
-            <span className="rounded bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-500">
-              +0.45%
-            </span>
+            <h1 className="text-lg font-bold">{currentPair || "Select a pair"}</h1>
+            {signals.length > 0 && (
+              <span className="rounded bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-500">
+                {signals.length} signal{signals.length > 1 ? "s" : ""}
+              </span>
+            )}
           </div>
         </div>
 
@@ -120,14 +127,28 @@ export default function TraderFocusedPage() {
               </div>
               <div className="flex-1 w-full relative">
                 <div className="absolute inset-0">
-                  <ChartComponent
-                    data={MOCK_DATA}
-                    type="candlestick"
-                    colors={{
-                      backgroundColor: "transparent",
-                      textColor: "#A1A1AA", // zinc-400
-                    }}
-                  />
+                  {loadingChart ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-sm text-muted-foreground">
+                        Loading chart data...
+                      </div>
+                    </div>
+                  ) : chartData.length > 0 ? (
+                    <ChartComponent
+                      data={chartData}
+                      type="candlestick"
+                      colors={{
+                        backgroundColor: "transparent",
+                        textColor: "#A1A1AA", // zinc-400
+                      }}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-sm text-muted-foreground">
+                        No chart data available
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </>
@@ -140,6 +161,7 @@ export default function TraderFocusedPage() {
             signals={signals}
             isLoading={isLoading}
             onRefresh={loadSignals}
+            onSignalClick={loadChartData}
           />
         </div>
       </div>

@@ -14,9 +14,10 @@ import { playSignal } from "@/lib/signals";
 
 interface SignalCardProps {
   signal: Signal;
+  onClick?: (pair: string) => void;
 }
 
-export function SignalCard({ signal }: SignalCardProps) {
+export function SignalCard({ signal, onClick }: SignalCardProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const isBuy = signal.direction === "BUY";
   const directionColor = isBuy ? "text-green-500" : "text-red-500";
@@ -38,7 +39,10 @@ export function SignalCard({ signal }: SignalCardProps) {
   };
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4 shadow-sm hover:shadow-md transition-shadow">
+    <div 
+      className="rounded-lg border border-border bg-card p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+      onClick={() => onClick?.(signal.pair)}
+    >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-full ${directionBg}`}>
