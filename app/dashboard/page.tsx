@@ -34,22 +34,36 @@ export default function TraderFocusedPage() {
     try {
       setIsLoading(true);
       const data = await fetchApprovedSignals();
+      console.log("Fetched signals:", data); // Debug log
       setSignals(data);
       
       // Load chart data for the first signal if available
       if (data.length > 0) {
-        await loadChartData(data[0].pair);
+        console.log("Loading chart for first signal:", data[0].pair);
+        const firstPair = data[0].pair;
+        setCurrentPair(firstPair);
+        setLoadingChart(true);
+        try {
+          const chartData = await fetchPairSignals(firstPair);
+          setChartData(chartData);
+        } catch (chartError) {
+          console.error("Failed to load chart data for", firstPair, chartError);
+          setChartData([]);
+        } finally {
+          setLoadingChart(false);
+        }
       }
     } catch (error) {
       console.error("Failed to load signals", error);
+      setSignals([]);
     } finally {
       setIsLoading(false);
     }
-  }, [loadChartData]);
+  }, []); // Remove loadChartData dependency to avoid circular dependency
 
   useEffect(() => {
     loadSignals();
-  }, [loadSignals]);
+  }, []); // Empty dependency array - only run once on mount
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">

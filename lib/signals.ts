@@ -29,8 +29,19 @@ export async function fetchApprovedSignals(): Promise<Signal[]> {
       throw new Error(`Failed to fetch signals: ${res.statusText}`);
     }
 
-    const data: SignalsResponse = await res.json();
-    return data.signals || [];
+    const data = await res.json();
+    
+    // Handle both array and object responses from the API
+    if (Array.isArray(data)) {
+      // If it's an array, get the first item's signals
+      const firstItem = data[0];
+      return firstItem?.signals || [];
+    } else if (data && typeof data === 'object') {
+      // If it's an object, get signals directly
+      return data.signals || [];
+    }
+    
+    return [];
   } catch (error) {
     console.error("Error fetching approved signals:", error);
     // Return empty array on error to allow UI to show "try again" rather than crashing
@@ -176,7 +187,9 @@ export interface ChartDataPoint {
   close: number;
 }
 
-export async function fetchPairSignals(pair: string): Promise<ChartDataPoint[]> {
+export async function fetchPairSignals(
+  pair: string
+): Promise<ChartDataPoint[]> {
   try {
     const res = await fetch(`${API_URL}/signals/pair/${pair}/signals`, {
       method: "GET",
@@ -191,11 +204,11 @@ export async function fetchPairSignals(pair: string): Promise<ChartDataPoint[]> 
     }
 
     const data: PairSignalResponse = await res.json();
-    
+
     // Transform FCS API response to chart data format
     // Get the first ticker (or you can aggregate all tickers)
     const ticker = data.signals.response[0];
-    
+
     if (!ticker) {
       return [];
     }
