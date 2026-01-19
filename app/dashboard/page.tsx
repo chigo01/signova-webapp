@@ -15,12 +15,14 @@ export default function TraderFocusedPage() {
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [loadingChart, setLoadingChart] = useState(false);
   const [currentPair, setCurrentPair] = useState<string>("");
+  const [selectedTimeframe, setSelectedTimeframe] = useState<string>("1h");
 
-  const loadChartData = useCallback(async (pair: string) => {
+  const loadChartData = useCallback(async (pair: string, timeframe?: string) => {
+    const period = timeframe || selectedTimeframe;
     try {
       setLoadingChart(true);
       setCurrentPair(pair);
-      const data = await fetchPairSignals(pair);
+      const data = await fetchPairSignals(pair, period, 100);
       setChartData(data);
     } catch (error) {
       console.error("Failed to load chart data for", pair, error);
@@ -28,7 +30,14 @@ export default function TraderFocusedPage() {
     } finally {
       setLoadingChart(false);
     }
-  }, []);
+  }, [selectedTimeframe]);
+
+  const handleTimeframeChange = useCallback((timeframe: string) => {
+    setSelectedTimeframe(timeframe);
+    if (currentPair) {
+      loadChartData(currentPair, timeframe);
+    }
+  }, [currentPair, loadChartData]);
 
   const loadSignals = useCallback(async () => {
     try {
@@ -130,12 +139,24 @@ export default function TraderFocusedPage() {
           ) : (
             <>
               <div className="mb-4 flex items-center gap-2">
-                {["1m", "5m", "15m", "1h", "4h", "D"].map((tf) => (
+                {[
+                  { label: "1m", value: "1m" },
+                  { label: "5m", value: "5m" },
+                  { label: "15m", value: "15m" },
+                  { label: "1h", value: "1h" },
+                  { label: "4h", value: "4h" },
+                  { label: "D", value: "1d" },
+                ].map((tf) => (
                   <button
-                    key={tf}
-                    className="rounded px-3 py-1 text-xs font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                    key={tf.value}
+                    onClick={() => handleTimeframeChange(tf.value)}
+                    className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+                      selectedTimeframe === tf.value
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    }`}
                   >
-                    {tf}
+                    {tf.label}
                   </button>
                 ))}
               </div>

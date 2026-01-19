@@ -30,17 +30,17 @@ export async function fetchApprovedSignals(): Promise<Signal[]> {
     }
 
     const data = await res.json();
-    
+
     // Handle both array and object responses from the API
     if (Array.isArray(data)) {
       // If it's an array, get the first item's signals
       const firstItem = data[0];
       return firstItem?.signals || [];
-    } else if (data && typeof data === 'object') {
+    } else if (data && typeof data === "object") {
       // If it's an object, get signals directly
       return data.signals || [];
     }
-    
+
     return [];
   } catch (error) {
     console.error("Error fetching approved signals:", error);
@@ -188,16 +188,21 @@ export interface ChartDataPoint {
 }
 
 export async function fetchPairSignals(
-  pair: string
+  pair: string,
+  period: string = "1h",
+  limit: number = 100
 ): Promise<ChartDataPoint[]> {
   try {
-    const res = await fetch(`${API_URL}/signals/pair/${pair}/signals`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-    });
+    const res = await fetch(
+      `${API_URL}/signals/pair/${pair}/signals?period=${period}&limit=${limit}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      }
+    );
 
     if (!res.ok) {
       throw new Error(`Failed to fetch pair signals: ${res.statusText}`);
@@ -205,32 +210,52 @@ export async function fetchPairSignals(
 
     const data: PairSignalResponse = await res.json();
 
-    // Transform FCS API response to chart data format
-    // Get the first ticker (or you can aggregate all tickers)
-    const ticker = data.signals.response[0];
+    console.log("FCS API Response structure:", {
+      hasSignals: !!data.signals,
+      hasResponse: !!(data.signals && data.signals.response),
+      responseType: data.signals?.response
+        ? typeof data.signals.response
+        : "undefined",
+      isArray: Array.isArray(data.signals?.response),
+    });
 
-    if (!ticker) {
+    // Transform FCS API historical response to chart data format
+    if (!data.signals || !data.signals.response) {
+      console.warn("No signals or response data found");
       return [];
     }
 
-    // Create chart data points from active and previous data
-    const chartData: ChartDataPoint[] = [
-      {
-        time: ticker.previous.tm.split(" ")[0], // Extract date
-        open: ticker.previous.o,
-        high: ticker.previous.h,
-        low: ticker.previous.l,
-        close: ticker.previous.c,
-      },
-      {
-        time: ticker.active.tm.split(" ")[0], // Extract date
-        open: ticker.active.o,
-        high: ticker.active.h,
-        low: ticker.active.l,
-        close: ticker.active.c,
-      },
-    ];
+    // FCS API history returns array of candles in response
+    const candles = data.signals.response;
 
+    if (!Array.isArray(candles) || candles.length === 0) {
+      console.warn("Candles is not an array or is empty:", candles);
+      return [];
+    }
+
+    // Transform each candle to our chart format
+    const chartData: ChartDataPoint[] = candles.map((candle: any) => {
+      // Handle both timestamp formats (Unix timestamp or milliseconds)
+      const timestamp = candle.tm * 1000; // Assuming tm is in seconds
+      const date = new Date(timestamp);
+
+      return {
+        time: date.toISOString().split("T")[0],
+        open: parseFloat(candle.o),
+        high: parseFloat(candle.h),
+        low: parseFloat(candle.l),
+        close: parseFloat(candle.c),
+      };
+    });
+
+    // Sort by time ascending (oldest first)
+    chartData.sort(
+      (a, b) => new Date(a.time).getTime() - new Date(b.time).getTime()
+    );
+
+    console.log(
+      `📊 Loaded ${chartData.length} candles for ${pair} (${period}, limit: ${limit})`
+    );
     return chartData;
   } catch (error) {
     console.error("Error fetching pair signals:", error);
