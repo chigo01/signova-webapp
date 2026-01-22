@@ -60,7 +60,6 @@ export function AuthForm({ type }: AuthFormProps) {
       const res = await fetch(`${API_URL}/auth/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ email, otp }),
       });
 
@@ -71,7 +70,14 @@ export function AuthForm({ type }: AuthFormProps) {
       const data = await res.json();
       console.log("Logged in:", data);
 
-      // Force reload to update auth state (cookie is set)
+      // Save token in cookie
+      const isProduction = window.location.protocol === "https:";
+      const maxAge = 7 * 24 * 60 * 60; // 7 days in seconds
+      document.cookie = `auth_token=${data.token}; path=/; max-age=${maxAge}${
+        isProduction ? "; secure" : ""
+      }; samesite=lax`;
+
+      // Force reload to update auth state
       window.location.href = "/";
     } catch (error) {
       console.error(error);

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { getAuthToken } from "@/lib/cookies";
 
 const Page = () => {
   const router = useRouter();
@@ -10,11 +11,18 @@ const Page = () => {
     const API_URL =
       process.env.NEXT_PUBLIC_API_URL || "https://signova-server.onrender.com";
 
-    // Check auth status via server (httpOnly cookie can't be read client-side)
+    // Check auth status using token from client-side cookie
     const checkAuth = async () => {
+      const token = getAuthToken();
+
+      if (!token) {
+        router.replace("/login");
+        return;
+      }
+
       try {
         const res = await fetch(`${API_URL}/auth/check`, {
-          credentials: "include",
+          headers: { Authorization: `Bearer ${token}` },
         });
 
         if (res.ok) {

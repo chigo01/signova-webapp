@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getAuthToken } from "@/lib/cookies";
 
 export default function DashboardLayout({
   children,
@@ -13,15 +14,23 @@ export default function DashboardLayout({
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check auth status via server (httpOnly cookie can't be read client-side)
+    // Check auth status using token from client-side cookie
     const checkAuth = async () => {
       const API_URL =
         process.env.NEXT_PUBLIC_API_URL ||
         "https://signova-server.onrender.com";
 
+      const token = getAuthToken();
+
+      if (!token) {
+        router.replace("/login");
+        setIsLoading(false);
+        return;
+      }
+
       try {
         const res = await fetch(`${API_URL}/auth/check`, {
-          credentials: "include",
+          headers: { Authorization: `Bearer ${token}` },
         });
 
         if (res.ok) {

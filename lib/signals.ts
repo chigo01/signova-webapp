@@ -1,4 +1,5 @@
 import { Signal } from "@/types/signal";
+import { getAuthToken } from "./cookies";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "https://signova-server.onrender.com";
@@ -13,12 +14,13 @@ interface SignalsResponse {
 
 export async function fetchApprovedSignals(): Promise<Signal[]> {
   try {
+    const token = getAuthToken();
     const res = await fetch(`${API_URL}/signals/approved`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
       },
-      credentials: "include", // Important for auth cookie
     });
 
     if (!res.ok) {
@@ -51,6 +53,7 @@ export async function fetchApprovedSignals(): Promise<Signal[]> {
 }
 
 export async function playSignal(signal: Signal): Promise<void> {
+  const token = getAuthToken();
   const payload = {
     signalId: signal._id,
     symbol: signal.pair,
@@ -64,8 +67,8 @@ export async function playSignal(signal: Signal): Promise<void> {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
     },
-    credentials: "include",
     body: JSON.stringify(payload),
   });
 
@@ -89,14 +92,15 @@ export async function fetchSignalHistory(
   page: number = 1,
   limit: number = 20
 ): Promise<SignalHistoryResponse> {
+  const token = getAuthToken();
   const res = await fetch(
     `${API_URL}/signals/history?page=${page}&limit=${limit}`,
     {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
       },
-      credentials: "include",
     }
   );
 
@@ -193,14 +197,15 @@ export async function fetchPairSignals(
   limit: number = 100
 ): Promise<ChartDataPoint[]> {
   try {
+    const token = getAuthToken();
     const res = await fetch(
       `${API_URL}/signals/pair/${pair}/signals?period=${period}&limit=${limit}`,
       {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
         },
-        credentials: "include",
       }
     );
 
