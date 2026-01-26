@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Play, RefreshCw, Video } from "lucide-react";
 import Link from "next/link";
-import { getAuthToken } from "@/lib/cookies";
 
 interface YoutubeVideo {
   _id: string;
@@ -23,20 +22,17 @@ export default function VideosPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<YoutubeVideo | null>(null);
 
-  const API_URL =
-    process.env.NEXT_PUBLIC_API_URL || "https://signova-server.onrender.com";
+  // Admin server URL for YouTube videos (public endpoint)
+  const ADMIN_API_URL =
+    process.env.NEXT_PUBLIC_ADMIN_API_URL ||
+    "https://fx-signal-server-mk93.onrender.com";
 
   const fetchVideos = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const token = getAuthToken();
-      const response = await fetch(`${API_URL}/youtube`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(`${ADMIN_API_URL}/youtube`);
 
       if (!response.ok) {
         throw new Error("Failed to fetch videos");
