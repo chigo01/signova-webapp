@@ -3,7 +3,11 @@
 import { ChartComponent } from "@/components/charts/chart";
 import { SignalsPanel } from "@/components/dashboard/signals-panel";
 import { Button } from "@/components/ui/button";
-import { fetchApprovedSignals, fetchPairSignals, ChartDataPoint } from "@/lib/signals";
+import {
+  fetchApprovedSignals,
+  fetchPairSignals,
+  ChartDataPoint,
+} from "@/lib/signals";
 import { Signal } from "@/types/signal";
 import { ArrowLeft, Bell, Settings } from "lucide-react";
 import Link from "next/link";
@@ -17,27 +21,33 @@ export default function TraderFocusedPage() {
   const [currentPair, setCurrentPair] = useState<string>("");
   const [selectedTimeframe, setSelectedTimeframe] = useState<string>("1h");
 
-  const loadChartData = useCallback(async (pair: string, timeframe?: string) => {
-    const period = timeframe || selectedTimeframe;
-    try {
-      setLoadingChart(true);
-      setCurrentPair(pair);
-      const data = await fetchPairSignals(pair, period, 100);
-      setChartData(data);
-    } catch (error) {
-      console.error("Failed to load chart data for", pair, error);
-      setChartData([]);
-    } finally {
-      setLoadingChart(false);
-    }
-  }, [selectedTimeframe]);
+  const loadChartData = useCallback(
+    async (pair: string, timeframe?: string) => {
+      const period = timeframe || selectedTimeframe;
+      try {
+        setLoadingChart(true);
+        setCurrentPair(pair);
+        const data = await fetchPairSignals(pair, period, 100);
+        setChartData(data);
+      } catch (error) {
+        console.error("Failed to load chart data for", pair, error);
+        setChartData([]);
+      } finally {
+        setLoadingChart(false);
+      }
+    },
+    [selectedTimeframe]
+  );
 
-  const handleTimeframeChange = useCallback((timeframe: string) => {
-    setSelectedTimeframe(timeframe);
-    if (currentPair) {
-      loadChartData(currentPair, timeframe);
-    }
-  }, [currentPair, loadChartData]);
+  const handleTimeframeChange = useCallback(
+    (timeframe: string) => {
+      setSelectedTimeframe(timeframe);
+      if (currentPair) {
+        loadChartData(currentPair, timeframe);
+      }
+    },
+    [currentPair, loadChartData]
+  );
 
   const loadSignals = useCallback(async () => {
     try {
@@ -45,7 +55,7 @@ export default function TraderFocusedPage() {
       const data = await fetchApprovedSignals();
       console.log("Fetched signals:", data); // Debug log
       setSignals(data);
-      
+
       // Load chart data for the first signal if available
       if (data.length > 0) {
         console.log("Loading chart for first signal:", data[0].pair);
@@ -80,7 +90,9 @@ export default function TraderFocusedPage() {
       <header className="flex h-16 items-center justify-between border-b border-border px-6">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold">{currentPair || "Select a pair"}</h1>
+            <h1 className="text-lg font-bold">
+              {currentPair || "Select a pair"}
+            </h1>
             {signals.length > 0 && (
               <span className="rounded bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-500">
                 {signals.length} signal{signals.length > 1 ? "s" : ""}
@@ -101,6 +113,11 @@ export default function TraderFocusedPage() {
           <Button variant="ghost" size="icon">
             <Settings className="h-5 w-5" />
           </Button>
+          <Link href="/dashboard/videos">
+            <Button variant="outline" size="sm" className="gap-2">
+              Videos
+            </Button>
+          </Link>
           <Link href="/dashboard/history">
             <Button variant="outline" size="sm" className="gap-2">
               History
