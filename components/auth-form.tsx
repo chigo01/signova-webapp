@@ -3,10 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import Image from "next/image";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import GoogleIcon from "@/assets/icons/Social/google.svg";
+import AppleIcon from "@/assets/icons/Social/apple.svg";
 
 interface AuthFormProps {
   type: "login" | "register";
@@ -88,17 +91,33 @@ export function AuthForm({ type }: AuthFormProps) {
   }
 
   return (
-    <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
-      <div className="flex flex-col space-y-2 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {type === "login" ? "Welcome back" : "Create an account"}
+    <div className="px-10 flex w-full flex-col justify-center space-y-6">
+      <div className="flex flex-col space-y-2 text-start">
+        <h1 className="text-4xl font-semibold tracking-tight bg-linear-to-r from-white via-[#A3A3A3] to-white bg-clip-text text-transparent">
+          {type === "login" ? "Welcome back!" : "Create an account"}
         </h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          {step === "email"
-            ? type === "login"
-              ? "Enter your email below to sign in"
-              : "Enter your email below to create your account"
-            : "Enter the code sent to your email"}
+        <p className="text-start text-sm text-zinc-500 dark:text-zinc-400">
+          {type === "login" ? (
+            <>
+              Don&apos;t have an account?{" "}
+              <Link
+                href="/register"
+                className="text-white underline underline-offset-4 hover:text-primary"
+              >
+                Sign up
+              </Link>
+            </>
+          ) : (
+            <>
+              Already have an account?{" "}
+              <Link
+                href="/login"
+                className="underline underline-offset-4 hover:text-primary"
+              >
+                Sign in
+              </Link>
+            </>
+          )}
         </p>
       </div>
 
@@ -138,7 +157,7 @@ export function AuthForm({ type }: AuthFormProps) {
               </div>
               <Button disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {type === "login" ? "Sign In with Email" : "Sign Up with Email"}
+                {type === "login" ? "Login" : "Sign Up"}
               </Button>
             </div>
           </form>
@@ -189,50 +208,39 @@ export function AuthForm({ type }: AuthFormProps) {
             </span>
           </div>
         </div>
-        <Button variant="outline" type="button" disabled={true}>
-          {/* Simple Google Icon placeholder or SVG */}
-          <svg
-            className="mr-2 h-4 w-4"
-            aria-hidden="true"
-            focusable="false"
-            data-prefix="fab"
-            data-icon="google"
-            role="img"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 488 512"
+        <div className="w-full flex justify-center space-x-4">
+          <Button
+            className="w-full"
+            variant="outline"
+            type="button"
+            disabled={true}
           >
-            <path
-              fill="currentColor"
-              d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"
-            ></path>
-          </svg>
-          Google
-        </Button>
+            <Image
+              src={GoogleIcon}
+              alt="Google"
+              width={20}
+              height={20}
+              className="mr-2"
+            />
+            Google
+          </Button>
+          <Button
+            className="w-full"
+            variant="outline"
+            type="button"
+            disabled={true}
+          >
+            <Image
+              src={AppleIcon}
+              alt="Apple"
+              width={20}
+              height={20}
+              className="mr-2"
+            />
+            Apple
+          </Button>
+        </div>
       </div>
-
-      <p className="px-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
-        {type === "login" ? (
-          <>
-            Don&apos;t have an account?{" "}
-            <Link
-              href="/register"
-              className="underline underline-offset-4 hover:text-primary"
-            >
-              Sign up
-            </Link>
-          </>
-        ) : (
-          <>
-            Already have an account?{" "}
-            <Link
-              href="/login"
-              className="underline underline-offset-4 hover:text-primary"
-            >
-              Sign in
-            </Link>
-          </>
-        )}
-      </p>
     </div>
   );
 }
