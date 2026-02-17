@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import GoogleIcon from "@/assets/icons/Social/google.svg";
-import AppleIcon from "@/assets/icons/Social/apple.svg";
+// import AppleIcon from "@/assets/icons/Social/apple.svg";
 
 interface AuthFormProps {
   type: "login" | "register";
@@ -224,7 +224,7 @@ export function AuthForm({ type }: AuthFormProps) {
             />
             Google
           </Button>
-          <Button
+          {/*<Button
             className="w-full"
             variant="outline"
             type="button"
@@ -238,7 +238,7 @@ export function AuthForm({ type }: AuthFormProps) {
               className="mr-2"
             />
             Apple
-          </Button>
+          </Button>*/}
         </div>
       </div>
     </div>
