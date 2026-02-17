@@ -4,12 +4,12 @@ import * as React from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
+import { useGoogleLogin } from "@react-oauth/google";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import GoogleIcon from "@/assets/icons/Social/google.svg";
-// import AppleIcon from "@/assets/icons/Social/apple.svg";
 
 interface AuthFormProps {
   type: "login" | "register";
@@ -23,6 +23,36 @@ export function AuthForm({ type }: AuthFormProps) {
 
   const API_URL =
     process.env.NEXT_PUBLIC_API_URL || "https://signova-server.onrender.com";
+
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        const res = await fetch(`${API_URL}/auth/google`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ access_token: tokenResponse.access_token }),
+        });
+
+        if (!res.ok) {
+          throw new Error("Google login failed");
+        }
+
+        const data = await res.json();
+
+        const isProduction = window.location.protocol === "https:";
+        const maxAge = 7 * 24 * 60 * 60;
+        document.cookie = `auth_token=${data.token}; path=/; max-age=${maxAge}${
+          isProduction ? "; secure" : ""
+        }; samesite=lax`;
+
+        window.location.href = "/";
+      } catch (error) {
+        console.error(error);
+        alert("Google login failed. Please try again.");
+      }
+    },
+    onError: () => alert("Google login failed. Please try again."),
+  });
 
   async function onEmailSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -213,7 +243,8 @@ export function AuthForm({ type }: AuthFormProps) {
             className="w-full"
             variant="outline"
             type="button"
-            disabled={true}
+            disabled={isLoading}
+            onClick={() => googleLogin()}
           >
             <Image
               src={GoogleIcon}
@@ -224,21 +255,6 @@ export function AuthForm({ type }: AuthFormProps) {
             />
             Google
           </Button>
-          {/*<Button
-            className="w-full"
-            variant="outline"
-            type="button"
-            disabled={true}
-          >
-            <Image
-              src={AppleIcon}
-              alt="Apple"
-              width={20}
-              height={20}
-              className="mr-2"
-            />
-            Apple
-          </Button>*/}
         </div>
       </div>
     </div>

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.8",
+    "@react-oauth/google": "^0.13.4",
     "@svg-maps/world": "^2.0.0",
     "clsx": "^2.1.1",
     "lightweight-charts": "^5.1.0",
