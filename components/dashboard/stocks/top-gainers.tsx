@@ -1,23 +1,17 @@
 "use client";
 
-const gainers = [
-  { symbol: "AAPL", name: "Apple", price: 125, change: 6.36 },
-  { symbol: "JPM", name: "JPM Chase", price: 121, change: 21.75 },
-  { symbol: "UBER", name: "Uber", price: 80, change: 3.84 },
-  { symbol: "NVDA", name: "Nvidia", price: 435, change: 5.65 },
-  { symbol: "GOOG", name: "Alphabet", price: 234, change: 6.45 },
-  { symbol: "MSFT", name: "Microsoft", price: 436, change: 9.54 },
-  { symbol: "TGT", name: "Target", price: 89, change: 11.85 },
-  { symbol: "NFLX", name: "Netflix", price: 123, change: 4.90 },
-  { symbol: "AMZN", name: "Amazon", price: 467, change: 5.98 },
-  { symbol: "META", name: "Meta Apps", price: 123, change: 18.94 },
-  { symbol: "META", name: "Meta Apps", price: 123, change: 18.94 },
-  { symbol: "META", name: "Meta Apps", price: 123, change: 18.94 },
-  { symbol: "META", name: "Meta Apps", price: 123, change: 18.94 },
-  { symbol: "META", name: "Meta Apps", price: 123, change: 18.94 },
-];
+import { StockRecommendation } from "@/lib/stocks";
 
-export function TopGainers() {
+interface Props {
+  stocks: StockRecommendation[];
+}
+
+export function TopGainers({ stocks }: Props) {
+  const gainers = stocks
+    .filter((s) => s.changePercent > 0)
+    .sort((a, b) => b.changePercent - a.changePercent)
+    .slice(0, 5);
+
   return (
     <div className="rounded-2xl bg-zinc-900 p-6">
       <h2 className="mb-4 text-lg font-semibold text-white">Top Gainers</h2>
@@ -33,18 +27,18 @@ export function TopGainers() {
             </tr>
           </thead>
           <tbody>
-            {gainers.map((stock, i) => (
+            {gainers.map((stock) => (
               <tr
-                key={i}
+                key={stock.symbol}
                 className="border-b border-zinc-800/50 last:border-0"
               >
                 <td className="py-3 text-sm text-white">{stock.symbol}</td>
                 <td className="py-3 text-sm text-zinc-400">{stock.name}</td>
                 <td className="py-3 pr-4 text-right text-sm text-white">
-                  {stock.price}
+                  ${stock.price.toFixed(2)}
                 </td>
                 <td className="py-3 text-right text-sm text-green-500">
-                  {stock.change}%
+                  +{stock.changePercent.toFixed(2)}%
                 </td>
               </tr>
             ))}
