@@ -26,7 +26,7 @@ function RecommendationCard({ stock }: { stock: StockRecommendation }) {
   const changePrefix = stock.changePercent >= 0 ? "↑" : "↓";
 
   return (
-    <div className="relative rounded-2xl bg-zinc-900 p-4 border border-zinc-800 overflow-hidden flex flex-col gap-2">
+    <div className="relative flex flex-col gap-2 overflow-hidden rounded-lg border border-[#1D1D1D] bg-[#121212] p-4">
       {/* Confidence bar at top of card */}
       <div className="absolute top-0 left-0 h-1 w-full bg-zinc-800">
         <div

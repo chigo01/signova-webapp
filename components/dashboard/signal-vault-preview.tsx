@@ -31,9 +31,9 @@ function SignalVaultChart({ data }: { data: typeof dummyData }) {
 
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
-      height: 350,
+      height: 260,
       layout: {
-        background: { type: ColorType.Solid, color: "#0B0B0B" },
+        background: { type: ColorType.Solid, color: "#121212" },
         textColor: "#A0A0A0",
       },
       grid: {
@@ -100,7 +100,7 @@ function SignalVaultChart({ data }: { data: typeof dummyData }) {
       ref={containerRef}
       style={{
         width: "100%",
-        height: "350px",
+        height: "260px",
       }}
     />
   );
@@ -108,23 +108,23 @@ function SignalVaultChart({ data }: { data: typeof dummyData }) {
 
 export function SignalVaultPreview() {
   return (
-    <div className="flex h-full flex-col rounded-2xl bg-zinc-900 p-6 shadow-lg">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-white">Signal vault</h2>
+    <div className="flex h-full flex-col rounded-lg border border-[#1D1D1D] bg-[#121212] p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-base font-semibold text-white">Signal vault</h2>
         <Button
           variant="secondary"
           size="sm"
-          className="bg-white text-black hover:bg-zinc-200"
+          className="h-8 shrink-0 rounded-full bg-white px-3 text-xs font-medium text-black hover:bg-zinc-200"
         >
           View active signals
         </Button>
       </div>
 
-      <div className="flex-1 min-h-[300px] w-full">
+      <div className="min-h-0 w-full flex-1">
         <SignalVaultChart data={dummyData} />
       </div>
 
-      <div className="mt-4 flex justify-between text-xs text-zinc-500">
+      <div className="mt-2 flex justify-between text-[10px] text-zinc-600">
         <span>Jan</span>
         <span>Feb</span>
         <span>Mar</span>

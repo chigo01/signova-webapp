@@ -99,7 +99,7 @@ export function HeatMap() {
   const rightColumnSectors = sectors.slice(1, 3); // Financials, Consumer staples
 
   return (
-    <div className="rounded-2xl bg-zinc-900 p-6 h-[500px] flex flex-col">
+    <div className="flex h-[500px] flex-col rounded-lg border border-[#1D1D1D] bg-[#121212] p-4">
       <div className="mb-4 flex items-center justify-between shrink-0">
         <h2 className="text-lg font-semibold text-white">Heat Map</h2>
       </div>
