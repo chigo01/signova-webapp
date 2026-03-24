@@ -28,7 +28,7 @@ export interface StockRecommendationsResponse {
 }
 
 export async function fetchStockRecommendations(): Promise<StockRecommendationsResponse> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const token = cookieStore.get("auth_token")?.value;
 
   const res = await fetch(`${API_URL}/stocks/recommendations`, {
