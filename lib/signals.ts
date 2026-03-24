@@ -1,8 +1,7 @@
 import { Signal } from "@/types/signal";
 import { getAuthToken } from "./cookies";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "https://signova-server.onrender.com";
+const API_URL = "https://web-server-4gpe.onrender.com";
 
 interface SignalsResponse {
   success: boolean;
