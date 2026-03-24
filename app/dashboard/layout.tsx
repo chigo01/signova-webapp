@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAuthToken } from "@/lib/cookies";
+import { API_URL } from "@/lib/config";
 import { Sidebar } from "@/components/dashboard/sidebar";
 
 export default function DashboardLayout({
@@ -17,10 +18,6 @@ export default function DashboardLayout({
   useEffect(() => {
     // Check auth status using token from client-side cookie
     const checkAuth = async () => {
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL ||
-        "https://signova-server.onrender.com";
-
       const token = getAuthToken();
 
       if (!token) {

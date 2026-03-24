@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import GoogleIcon from "@/assets/icons/Social/google.svg";
+import { API_URL } from "@/lib/config";
 
 interface AuthFormProps {
   type: "login" | "register";
@@ -20,9 +21,6 @@ export function AuthForm({ type }: AuthFormProps) {
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
   const [email, setEmail] = React.useState("");
   const [otp, setOtp] = React.useState("");
-
-  const API_URL =
-    process.env.NEXT_PUBLIC_API_URL || "https://signova-server.onrender.com";
 
   const googleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {

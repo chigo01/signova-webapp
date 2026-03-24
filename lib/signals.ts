@@ -1,7 +1,6 @@
 import { Signal } from "@/types/signal";
+import { API_URL } from "@/lib/config";
 import { getAuthToken } from "./cookies";
-
-const API_URL = "https://web-server-4gpe.onrender.com";
 
 interface SignalsResponse {
   success: boolean;

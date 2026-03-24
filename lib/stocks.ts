@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "https://signova-server.onrender.com";
+import { API_URL } from "@/lib/config";
 
 export interface StockRecommendation {
   symbol: string;

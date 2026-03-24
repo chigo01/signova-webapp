@@ -3,14 +3,12 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getAuthToken } from "@/lib/cookies";
+import { API_URL } from "@/lib/config";
 
 const Page = () => {
   const router = useRouter();
 
   useEffect(() => {
-    const API_URL =
-      process.env.NEXT_PUBLIC_API_URL || "https://signova-server.onrender.com";
-
     // Check auth status using token from client-side cookie
     const checkAuth = async () => {
       const token = getAuthToken();

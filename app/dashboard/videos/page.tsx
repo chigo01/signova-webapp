@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Play, RefreshCw, Search, Video } from "lucide-react";
 import Link from "next/link";
 
+import { ADMIN_API_URL } from "@/lib/config";
+
 interface YoutubeVideo {
   _id: string;
   title: string;
@@ -22,11 +24,6 @@ export default function VideosPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<YoutubeVideo | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-
-  // Admin server URL for YouTube videos (public endpoint)
-  const ADMIN_API_URL =
-    process.env.NEXT_PUBLIC_ADMIN_API_URL ||
-    "https://fx-signal-server-mk93.onrender.com";
 
   const fetchVideos = async () => {
     try {
