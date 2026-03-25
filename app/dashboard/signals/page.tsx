@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Search,
   RefreshCw,
@@ -8,7 +8,6 @@ import {
   Loader2,
   Target,
   ShieldAlert,
-  ChevronDown,
   AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,49 +15,7 @@ import { Signal } from "@/types/signal";
 import { fetchApprovedSignals, playSignal } from "@/lib/signals";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { BinanceCandleChart } from "@/components/signals/binance-candle-chart";
-
-/** Shown first; union with signals’ pairs so the current selection always appears */
-const POPULAR_PAIRS = [
-  "EUR/USD",
-  "GBP/USD",
-  "USD/JPY",
-  "AUD/USD",
-  "USD/CHF",
-  "NZD/USD",
-  "USD/CAD",
-  "XAU/USD",
-  "BTC/USDT",
-  "ETH/USDT",
-  "BNB/USDT",
-  "SOL/USDT",
-] as const;
-
-// Timeframe options
-const timeframes = [
-  { label: "1m", value: "1m" },
-  { label: "5m", value: "5m" },
-  { label: "15m", value: "15m" },
-  { label: "30m", value: "30m" },
-  { label: "1h", value: "1h" },
-  { label: "2h", value: "2h" },
-  { label: "4h", value: "4h" },
-  { label: "D", value: "1d" },
-  { label: "W", value: "1w" },
-  { label: "M", value: "1M" },
-  { label: "All", value: "all" },
-];
-
-/** Mobile mock: 1m … 4h in a single scroll row */
-const MOBILE_TIMEFRAME_VALUES = new Set([
-  "1m",
-  "5m",
-  "15m",
-  "30m",
-  "1h",
-  "2h",
-  "4h",
-]);
+import TradingViewWidget from "@/components/signals/tradingview-widget";
 
 function formatConfidenceDisplay(confidence: number): string {
   if (confidence > 0 && confidence <= 1) {
@@ -68,6 +25,14 @@ function formatConfidenceDisplay(confidence: number): string {
     return `${confidence.toFixed(2)}%`;
   }
   return `${confidence}%`;
+}
+
+function formatLevelValue(value: number): string {
+  // Keep signal levels compact so they never overflow the TP/SL boxes.
+  if (!Number.isFinite(value)) return String(value);
+  if (Math.abs(value) >= 100) return value.toFixed(3);
+  if (Math.abs(value) >= 1) return value.toFixed(6);
+  return value.toFixed(8);
 }
 
 /* ─── Signal Card (matches image design) ─── */
@@ -96,14 +61,14 @@ function VaultSignalCard({
   };
 
   return (
-    <div className="rounded-xl border border-zinc-800/90 bg-[#1a1a1a] p-4">
+    <div className="flex flex-col gap-[14px] rounded-[8px] border border-[#1D1D1D] bg-[#121212] px-[13px] py-[14px]">
       {/* Row 1: pair | Confidence label */}
-      <div className="mb-2 flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-2">
         <h3 className="text-sm font-bold text-white">{signal.pair}</h3>
         <span className="text-[10px] font-medium text-zinc-500">Confidence</span>
       </div>
       {/* Row 2: direction | confidence value */}
-      <div className="mb-3 flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <span className={`text-xs font-bold ${directionColor}`}>
           {signal.direction}
         </span>
@@ -113,7 +78,7 @@ function VaultSignalCard({
       </div>
 
       {/* Entry Price */}
-      <div className="mb-3 flex items-center justify-between rounded-lg bg-zinc-900/80 px-3 py-2.5">
+      <div className="flex items-center justify-between rounded-lg bg-zinc-900/80 px-3 py-2.5">
         <span className="text-xs text-zinc-400">Entry</span>
         <span className="text-xs font-mono text-white">
           {signal.entryPrice}
@@ -121,32 +86,38 @@ function VaultSignalCard({
       </div>
 
       {/* TP1 & SL */}
-      <div className="mb-3 grid grid-cols-2 gap-2">
-        <div className="rounded-lg border border-emerald-500/25 bg-emerald-950/40 px-3 py-2.5">
-          <div className="mb-1 flex items-center gap-1.5">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col items-center justify-center gap-[10px] rounded-[4px] border border-[#10C29C]/30 bg-[#10C29C]/10 p-[8px] text-center">
+          <div className="flex items-center gap-1.5">
             <Target className="h-3 w-3 text-emerald-400" />
             <span className="text-[10px] font-semibold text-emerald-400">
               TP1
             </span>
           </div>
-          <span className="block text-center text-xs font-mono text-white">
-            {signal.exitTargets.takeProfit1}
+          <span
+            className="block w-full truncate text-center text-xs font-mono text-white"
+            title={String(signal.exitTargets.takeProfit1)}
+          >
+            {formatLevelValue(signal.exitTargets.takeProfit1)}
           </span>
         </div>
-        <div className="rounded-lg border border-red-500/25 bg-red-950/40 px-3 py-2.5">
-          <div className="mb-1 flex items-center gap-1.5">
+        <div className="flex flex-col items-center justify-center gap-[10px] rounded-[4px] border border-[#F63B6B]/30 bg-[#F63B6B]/10 p-[8px] text-center">
+          <div className="flex items-center gap-1.5">
             <ShieldAlert className="h-3 w-3 text-red-400" />
             <span className="text-[10px] font-semibold text-red-400">SL</span>
           </div>
-          <span className="block text-center text-xs font-mono text-white">
-            {signal.exitTargets.stopLoss}
+          <span
+            className="block w-full truncate text-center text-xs font-mono text-white"
+            title={String(signal.exitTargets.stopLoss)}
+          >
+            {formatLevelValue(signal.exitTargets.stopLoss)}
           </span>
         </div>
       </div>
 
       {/* Reasoning */}
       {signal.reasoning && signal.reasoning.length > 0 && (
-        <p className="mb-3 line-clamp-3 text-[11px] leading-relaxed text-zinc-500">
+        <p className="line-clamp-3 text-[11px] leading-relaxed text-zinc-500">
           {signal.reasoning[0]}
         </p>
       )}
@@ -172,29 +143,10 @@ function VaultSignalCard({
 /* ─── Main Page ─── */
 export default function SignalVaultPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
-  const [selectedTimeframe, setSelectedTimeframe] = useState("1h");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoadingSignals, setIsLoadingSignals] = useState(true);
   /** Set when fetch throws so we show the same refresh affordances as empty state */
   const [signalsLoadError, setSignalsLoadError] = useState<string | null>(null);
-  const [selectedPair, setSelectedPair] = useState("EUR/USD");
-
-  const pairOptions = useMemo(() => {
-    const seen = new Set<string>(POPULAR_PAIRS as readonly string[]);
-    const extras: string[] = [];
-    if (selectedPair && !seen.has(selectedPair)) {
-      extras.push(selectedPair);
-      seen.add(selectedPair);
-    }
-    signals.forEach((s) => {
-      if (!seen.has(s.pair)) {
-        extras.push(s.pair);
-        seen.add(s.pair);
-      }
-    });
-    extras.sort((a, b) => a.localeCompare(b));
-    return [...POPULAR_PAIRS, ...extras];
-  }, [selectedPair, signals]);
 
   const loadSignals = useCallback(async () => {
     try {
@@ -202,10 +154,6 @@ export default function SignalVaultPage() {
       setSignalsLoadError(null);
       const data = await fetchApprovedSignals();
       setSignals(data);
-
-      if (data.length > 0) {
-        setSelectedPair(data[0].pair);
-      }
     } catch (error) {
       console.error("Failed to load signals:", error);
       setSignals([]);
@@ -223,27 +171,10 @@ export default function SignalVaultPage() {
     loadSignals();
   }, [loadSignals]);
 
-  const handlePairChange = (pair: string) => {
-    setSelectedPair(pair);
-  };
-
-  const handleTimeframeChange = (tf: string) => {
-    setSelectedTimeframe(tf);
-  };
-
   const handleSignalPlay = (signal: Signal) => {
     // Could show a toast notification here
     console.log("Signal played:", signal.pair);
   };
-
-  const mobileTimeframeList = useMemo(() => {
-    const list = timeframes.filter((tf) => MOBILE_TIMEFRAME_VALUES.has(tf.value));
-    if (!list.some((tf) => tf.value === selectedTimeframe)) {
-      const extra = timeframes.find((tf) => tf.value === selectedTimeframe);
-      if (extra) return [extra, ...list];
-    }
-    return list;
-  }, [selectedTimeframe]);
 
   const signalsPanel = (
     <>
@@ -266,8 +197,8 @@ export default function SignalVaultPage() {
         className={cn(
           "space-y-4 p-4 pb-8 lg:min-h-0 lg:flex-1 lg:pb-4",
           signals.length > 0
-            ? "max-h-[52vh] overflow-y-auto sm:max-h-[56vh] lg:max-h-none lg:overflow-y-auto"
-            : "min-h-[min(260px,50vh)] lg:overflow-y-auto"
+            ? "max-h-[72vh] overflow-y-auto sm:max-h-[76vh] lg:max-h-full lg:overflow-y-auto"
+            : "min-h-[min(260px,50vh)] lg:max-h-full lg:overflow-y-auto"
         )}
       >
         {isLoadingSignals && signals.length === 0 && !signalsLoadError ? (
@@ -323,7 +254,7 @@ export default function SignalVaultPage() {
   );
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-black">
+    <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-black lg:overflow-hidden">
       {/* Desktop top bar */}
       <header className="hidden items-center justify-between border-b border-zinc-800 px-6 py-4 lg:flex">
         <h3 className="text-lg font-semibold text-white">Signal vault</h3>
@@ -355,85 +286,14 @@ export default function SignalVaultPage() {
         <h1 className="text-base font-semibold text-white">Signal vault</h1>
       </div>
 
-      {/* Pair + timeframes */}
-      <div className="border-b border-zinc-800 px-4 py-3 lg:px-6">
-        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="shrink-0 text-xs text-zinc-500">Pair</span>
-            <select
-              value={selectedPair}
-              onChange={(e) => handlePairChange(e.target.value)}
-              aria-label="Currency pair"
-              className="h-10 min-w-0 flex-1 cursor-pointer rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500/40 lg:h-8 lg:min-w-32 lg:rounded-md lg:text-xs"
-            >
-              {pairOptions.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Mobile: horizontal scroll, pill selected state (dark gray) */}
-        <div className="lg:hidden">
-          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {mobileTimeframeList.map((tf) => (
-              <button
-                key={tf.value}
-                type="button"
-                onClick={() => handleTimeframeChange(tf.value)}
-                className={cn(
-                  "shrink-0 rounded-full px-3.5 py-2 text-xs font-medium transition-colors",
-                  selectedTimeframe === tf.value
-                    ? "bg-zinc-700 text-white"
-                    : "bg-transparent text-zinc-500 hover:text-zinc-300"
-                )}
-              >
-                {tf.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Desktop: full timeframe row */}
-        <div className="mt-2 hidden flex-wrap items-center gap-x-2 gap-y-2 lg:flex">
-          <span className="mr-1 text-xs text-zinc-500">Time frame:</span>
-          {timeframes.map((tf) => (
-            <button
-              key={tf.value}
-              type="button"
-              onClick={() => handleTimeframeChange(tf.value)}
-              className={cn(
-                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                selectedTimeframe === tf.value
-                  ? "bg-emerald-500/20 text-emerald-400"
-                  : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
-              )}
-            >
-              {tf.label}
-            </button>
-          ))}
-          <button
-            type="button"
-            className="ml-1 flex items-center gap-1 rounded-md px-2.5 py-1 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
-          >
-            2m
-            <ChevronDown className="h-3 w-3" />
-          </button>
-        </div>
-      </div>
-
       {/* Mobile: chart first, Active Signals below; desktop: chart | sidebar */}
-      <div className="flex min-h-0 flex-col lg:min-h-[min(720px,calc(100vh-11rem))] lg:flex-1 lg:flex-row lg:overflow-hidden">
+      <div className="flex min-h-0 flex-col px-3 lg:h-[calc(100dvh-5.5rem)] lg:flex-row lg:overflow-hidden lg:px-0">
         {/* Chart column */}
-        <section className="flex min-h-0 flex-col lg:min-h-0 lg:flex-1">
-          <div className="relative flex min-h-0 flex-1 flex-col px-2 pb-2 pt-1 lg:min-h-0">
-            <BinanceCandleChart
-              key={`${selectedPair}-${selectedTimeframe}`}
-              pair={selectedPair}
-              timeframe={selectedTimeframe}
-            />
+        <section className="flex min-h-0 flex-col lg:h-full lg:min-h-0 lg:flex-1">
+          <div className="relative flex min-h-0 flex-1 flex-col px-2 pb-2 pt-1 lg:h-full lg:min-h-0">
+            <div className="h-[min(42vh,380px)] max-h-[420px] min-h-[280px] w-full flex-1 sm:h-[min(50vh,480px)] sm:max-h-[520px] lg:h-full lg:max-h-[760px] lg:min-h-[400px]">
+              <TradingViewWidget symbol="OANDA:EURUSD" interval="D" />
+            </div>
           </div>
 
           {/* Mobile: Watch tutorials under chart */}
@@ -452,8 +312,8 @@ export default function SignalVaultPage() {
         </section>
 
         {/* Active signals — full width card on mobile, sidebar on desktop */}
-        <aside className="mt-1 flex min-h-0 flex-col rounded-t-2xl border border-zinc-800/90 bg-[#121212] lg:mt-0 lg:w-80 lg:shrink-0 lg:rounded-none lg:border-b-0 lg:border-l lg:border-t-0 lg:bg-zinc-950/50">
-          <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden">
+        <aside className="mt-1 flex min-h-0 flex-col rounded-2xl border border-zinc-800/90 bg-[#121212] lg:mt-0 lg:h-full lg:w-80 lg:shrink-0 lg:rounded-none lg:border-b-0 lg:border-l lg:border-t-0 lg:bg-zinc-950/50">
+          <div className="lg:flex lg:h-full lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden">
             {signalsPanel}
           </div>
         </aside>
