@@ -98,7 +98,7 @@ function toSvg(coords: [number, number]): [number, number] {
 
 export function GlobalMarkets() {
   return (
-    <div className="rounded-2xl bg-zinc-900 p-6">
+    <div className="rounded-lg border border-[#1D1D1D] bg-[#121212] p-4">
       <h2 className="mb-6 text-lg font-semibold text-white">Global Markets</h2>
 
       <div className="relative overflow-hidden rounded-lg bg-zinc-950">

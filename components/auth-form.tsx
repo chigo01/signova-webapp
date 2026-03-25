@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import GoogleIcon from "@/assets/icons/Social/google.svg";
-import { API_URL } from "@/lib/config";
+import { setAuthUserProfile } from "@/lib/auth-user";
 
 interface AuthFormProps {
   type: "login" | "register";
@@ -21,6 +21,9 @@ export function AuthForm({ type }: AuthFormProps) {
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
   const [email, setEmail] = React.useState("");
   const [otp, setOtp] = React.useState("");
+
+  const API_URL =
+    process.env.NEXT_PUBLIC_API_URL || "https://web-server-4gpe.onrender.com";
 
   const googleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
@@ -36,6 +39,10 @@ export function AuthForm({ type }: AuthFormProps) {
         }
 
         const data = await res.json();
+
+        if (data.user) {
+          setAuthUserProfile(data.user);
+        }
 
         const isProduction = window.location.protocol === "https:";
         const maxAge = 7 * 24 * 60 * 60;
@@ -100,6 +107,10 @@ export function AuthForm({ type }: AuthFormProps) {
 
       const data = await res.json();
       console.log("Logged in:", data);
+
+      if (data.user) {
+        setAuthUserProfile(data.user);
+      }
 
       // Save token in cookie
       const isProduction = window.location.protocol === "https:";

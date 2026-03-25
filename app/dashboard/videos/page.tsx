@@ -59,7 +59,7 @@ export default function VideosPage() {
   );
 
   return (
-    <main className="ml-64 flex-1 overflow-y-auto">
+    <main className="flex-1 overflow-y-auto overflow-x-hidden">
       <div className="flex h-screen flex-col">
         {/* Header */}
         <header className="flex items-center justify-between border-b border-zinc-800 px-6 py-4">

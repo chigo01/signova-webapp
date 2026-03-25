@@ -26,7 +26,7 @@ export default async function StocksPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-black p-6 ml-64 flex-1 overflow-y-auto">
+    <div className="min-h-screen flex-1 overflow-y-auto overflow-x-hidden bg-black px-4 py-6 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-white">Stock options</h1>

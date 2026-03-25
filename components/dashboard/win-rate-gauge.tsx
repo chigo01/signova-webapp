@@ -2,22 +2,19 @@
 
 export function WinRateGauge({ value = 80 }: { value?: number }) {
   const accent = "#2DD4BF";
-  const bg = "#0d0d0d";
+  const bg = "#121212";
   const track = "#2a2a2a";
 
-  // Arc geometry
   const cx = 150;
   const cy = 148;
-  const r = 120;
-  const sw = 24;
+  const r = 118;
+  const sw = 20;
 
-  // Convert math-convention angle (degrees) to SVG point
   const pt = (deg: number, radius = r) => ({
     x: cx + radius * Math.cos((deg * Math.PI) / 180),
     y: cy - radius * Math.sin((deg * Math.PI) / 180),
   });
 
-  // Build SVG arc path from one angle to another
   const arc = (from: number, to: number) => {
     const s = pt(from);
     const e = pt(to);
@@ -28,45 +25,48 @@ export function WinRateGauge({ value = 80 }: { value?: number }) {
   const v = Math.min(100, Math.max(0, value));
   const va = 180 - (v / 100) * 180;
 
-  // Section divider tick angles (between each of 5 sections)
   const ticks = [144, 108, 72, 36];
 
   return (
-    <div
-      className="flex flex-col items-center rounded-3xl w-full"
-      style={{ backgroundColor: bg, padding: "24px 24px 32px" }}
-    >
-      {/* "First 2 weeks FREE" badge */}
-      <span className="mb-8 inline-block rounded bg-white px-5 py-2 text-sm font-black text-black tracking-wide">
+    <div className="flex h-full min-h-0 w-full flex-col rounded-lg border border-[#1D1D1D] bg-[#121212] p-4">
+      <span className="mx-auto inline-flex shrink-0 rounded-md bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-black">
         First 2 weeks FREE
       </span>
 
-      {/* Gauge area */}
-      <div className="relative w-full max-w-[400px]">
-        {/* Labels positioned around the gauge */}
-        <div className="absolute left-[-10%] bottom-[10%] text-[11px] font-bold text-white tracking-[0.15em] leading-tight">
-          STRONG
-          <br />
-          SELL
-        </div>
-        <div className="absolute left-[15%] top-[16%] text-[11px] font-bold text-white tracking-[0.15em]">
-          SELL
-        </div>
-        <div className="absolute left-1/2 -translate-x-1/2 top-[1%] text-[11px] font-bold text-white tracking-[0.15em]">
-          NEUTRAL
-        </div>
-        <div className="absolute right-[15%] top-[16%] text-[11px] font-bold text-white tracking-[0.15em]">
-          BUY
-        </div>
-        <div className="absolute right-[-10%] bottom-[10%] text-[11px] font-bold text-zinc-400 tracking-[0.15em] leading-tight text-right">
-          STRONG
-          <br />
-          BUY
+      <div className="relative mt-3 flex min-h-[168px] w-full flex-1 flex-col justify-end overflow-visible px-1 sm:px-2">
+        <div className="pointer-events-none absolute inset-x-1 top-0 z-10 flex h-[58px] justify-between sm:inset-x-2">
+          <div className="flex w-12 flex-col items-center justify-end text-center">
+            <span className="text-[9px] font-bold leading-tight tracking-wide text-zinc-500">
+              STRONG
+            </span>
+            <span className="text-[9px] font-bold leading-tight tracking-wide text-zinc-500">
+              SELL
+            </span>
+          </div>
+          <div className="absolute left-[26%] top-[28%] text-[9px] font-bold tracking-wide text-zinc-400">
+            SELL
+          </div>
+          <div className="absolute left-1/2 top-0 -translate-x-1/2 text-[9px] font-bold tracking-wide text-zinc-300">
+            NEUTRAL
+          </div>
+          <div className="absolute right-[26%] top-[28%] text-[9px] font-bold tracking-wide text-zinc-400">
+            BUY
+          </div>
+          <div className="flex w-12 flex-col items-center justify-end text-center">
+            <span className="text-[9px] font-bold leading-tight tracking-wide text-zinc-500">
+              STRONG
+            </span>
+            <span className="text-[9px] font-bold leading-tight tracking-wide text-zinc-500">
+              BUY
+            </span>
+          </div>
         </div>
 
-        {/* SVG gauge arc */}
-        <svg viewBox="0 0 300 162" className="w-full h-auto">
-          {/* Background track (full semicircle) */}
+        <svg
+          viewBox="0 0 300 162"
+          className="relative z-0 mt-1 max-h-[132px] w-full shrink-0"
+          aria-hidden
+        >
           <path
             d={arc(180, 0)}
             fill="none"
@@ -74,8 +74,6 @@ export function WinRateGauge({ value = 80 }: { value?: number }) {
             strokeWidth={sw}
             strokeLinecap="round"
           />
-
-          {/* Filled value track */}
           {v > 0 && (
             <path
               d={arc(180, va)}
@@ -85,11 +83,9 @@ export function WinRateGauge({ value = 80 }: { value?: number }) {
               strokeLinecap="round"
             />
           )}
-
-          {/* Section divider ticks */}
           {ticks.map((a) => {
-            const p1 = pt(a, r - sw / 2 - 4);
-            const p2 = pt(a, r + sw / 2 + 4);
+            const p1 = pt(a, r - sw / 2 - 3);
+            const p2 = pt(a, r + sw / 2 + 3);
             return (
               <line
                 key={a}
@@ -98,16 +94,17 @@ export function WinRateGauge({ value = 80 }: { value?: number }) {
                 x2={p2.x}
                 y2={p2.y}
                 stroke={bg}
-                strokeWidth={5}
+                strokeWidth={3}
               />
             );
           })}
         </svg>
 
-        {/* Center value display */}
-        <div className="absolute inset-x-0 bottom-[2%] text-center">
-          <p className="text-5xl font-bold text-white leading-none">{v}%</p>
-          <p className="mt-2 text-base italic" style={{ color: accent }}>
+        <div className="absolute inset-x-0 bottom-0 z-10 px-2 text-center">
+          <p className="text-4xl font-bold leading-none tracking-tight text-white">
+            {v}%
+          </p>
+          <p className="mt-1 text-xs font-medium leading-snug text-zinc-500">
             Favour&apos;s Win Rate
           </p>
         </div>

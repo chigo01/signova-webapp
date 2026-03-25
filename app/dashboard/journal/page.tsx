@@ -84,7 +84,7 @@ function StatCard({
 
 export default function JournalPage() {
   return (
-    <main className="ml-64 flex-1 overflow-y-auto">
+    <main className="flex-1 overflow-y-auto overflow-x-hidden">
       <div className="p-8">
         {/* Header */}
         <header className="mb-8 flex items-center justify-between border-b border-zinc-800 pb-4">
