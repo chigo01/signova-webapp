@@ -63,10 +63,10 @@ export function HistoryTable({ data, isLoading }: HistoryTableProps) {
                     {play.entryPrice}
                   </td>
                   <td className="px-4 py-3 font-mono text-green-600/80">
-                    {play.targetPrice || "-"}
+                    {play.targetPrice}
                   </td>
                   <td className="px-4 py-3 font-mono text-red-600/80">
-                    {play.stopLoss || "-"}
+                    {play.stopLoss}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {new Date(play.playedAt).toLocaleString(undefined, {

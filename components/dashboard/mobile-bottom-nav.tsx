@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 const items = [
   { title: "Dashboard", href: "/dashboard", Icon: Presentation },
-  { title: "Signal", href: "/dashboard/signals", Icon: LineChart },
+  { title: "Signal", href: "/dashboard/signal-vault", Icon: LineChart },
   { title: "Stocks", href: "/dashboard/stocks", Icon: PieChart },
   { title: "Journal", href: "/dashboard/journal", Icon: BarChart3 },
 ] as const;
@@ -31,7 +31,11 @@ export function MobileBottomNav() {
           const isActive =
             item.href === "/dashboard"
               ? pathname === "/dashboard"
-              : pathname === item.href || pathname.startsWith(`${item.href}/`);
+              : item.href === "/dashboard/signal-vault"
+                ? pathname === "/dashboard/signal-vault" ||
+                  pathname === "/dashboard/signals"
+                : pathname === item.href ||
+                  pathname.startsWith(`${item.href}/`);
           const { Icon } = item;
           return (
             <Link

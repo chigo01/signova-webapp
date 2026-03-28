@@ -76,6 +76,7 @@ export async function playSignal(signal: Signal): Promise<void> {
   }
 }
 
+/** GET /signals/history?page=&limit= — paginated list of plays for the authenticated user. */
 export interface SignalHistoryResponse {
   data: import("@/types/signal").SignalPlay[];
   pagination: {

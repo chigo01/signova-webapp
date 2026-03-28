@@ -67,6 +67,7 @@ export interface Signal {
   };
 }
 
+/** Row from GET /signals/history (signal play records). */
 export interface SignalPlay {
   _id: string;
   userId: string;
@@ -74,9 +75,10 @@ export interface SignalPlay {
   symbol: string;
   signalType: "buy" | "sell";
   entryPrice: number;
-  targetPrice?: number;
-  stopLoss?: number;
+  targetPrice: number;
+  stopLoss: number;
   playedAt: string;
   createdAt: string;
   updatedAt: string;
+  __v?: number;
 }
