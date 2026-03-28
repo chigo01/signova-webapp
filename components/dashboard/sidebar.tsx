@@ -22,7 +22,7 @@ const sidebarItems = [
   },
   {
     title: "Signal vault",
-    href: "/dashboard/signals",
+    href: "/dashboard/signal-vault",
     icon: SignalVault,
   },
   {
@@ -110,7 +110,11 @@ export function Sidebar() {
       <div className="flex-1 px-4 py-6">
         <nav className="space-y-2">
           {sidebarItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive =
+              item.href === "/dashboard/signal-vault"
+                ? pathname === "/dashboard/signal-vault" ||
+                  pathname === "/dashboard/signals"
+                : pathname === item.href;
             return (
               <Link
                 key={item.href}

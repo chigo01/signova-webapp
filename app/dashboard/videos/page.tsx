@@ -65,7 +65,7 @@ export default function VideosPage() {
         <header className="flex items-center justify-between border-b border-zinc-800 px-6 py-4">
           <div className="flex items-center gap-1.5 text-sm">
             <Link
-              href="/dashboard/signals"
+              href="/dashboard/signal-vault"
               className="text-zinc-500 hover:text-zinc-300 transition-colors"
             >
               Signal vault
