@@ -135,7 +135,7 @@ export function AuthForm({ type }: AuthFormProps) {
         <h1 className="text-4xl font-semibold tracking-tight bg-linear-to-r from-white via-[#A3A3A3] to-white bg-clip-text text-transparent">
           {type === "login" ? "Welcome back!" : "Create an account"}
         </h1>
-        <p className="text-start text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="text-start text-sm text-zinc-400">
           {type === "login" ? (
             <>
               Don&apos;t have an account?{" "}
@@ -239,10 +239,10 @@ export function AuthForm({ type }: AuthFormProps) {
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-zinc-200 dark:border-zinc-800" />
+            <span className="w-full border-t border-zinc-800" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-zinc-500 dark:bg-zinc-950 dark:text-zinc-400">
+            <span className="bg-zinc-950 px-2 text-zinc-400">
               Or continue with
             </span>
           </div>

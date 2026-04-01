@@ -18,16 +18,6 @@ import { cn } from "@/lib/utils";
 import { pairToTradingViewSymbol } from "@/lib/tradingview-symbol";
 import TradingViewWidget from "@/components/signals/tradingview-widget";
 
-function formatConfidenceDisplay(confidence: number): string {
-  if (confidence > 0 && confidence <= 1) {
-    return `${(confidence * 100).toFixed(2)}%`;
-  }
-  if (confidence > 1 && confidence <= 100) {
-    return `${confidence.toFixed(2)}%`;
-  }
-  return `${confidence}%`;
-}
-
 function formatLevelValue(value: number): string {
   // Keep signal levels compact so they never overflow the TP/SL boxes.
   if (!Number.isFinite(value)) return String(value);
@@ -63,18 +53,10 @@ function VaultSignalCard({
 
   return (
     <div className="flex flex-col gap-[14px] rounded-[8px] border border-[#1D1D1D] bg-[#121212] px-[13px] py-[14px]">
-      {/* Row 1: pair | Confidence label */}
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="text-sm font-bold text-white">{signal.pair}</h3>
-        <span className="text-[10px] font-medium text-zinc-500">Confidence</span>
-      </div>
-      {/* Row 2: direction | confidence value */}
       <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-bold text-white">{signal.pair}</h3>
         <span className={`text-xs font-bold ${directionColor}`}>
           {signal.direction}
-        </span>
-        <span className="text-xs font-mono text-white">
-          {formatConfidenceDisplay(signal.confidence)}
         </span>
       </div>
 

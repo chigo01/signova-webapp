@@ -1,11 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { AlertCircle, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { StockRecommendation } from "@/lib/stocks";
 
 interface Props {
   watchlist: StockRecommendation[];
   topMovers: StockRecommendation[];
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
 const REC_STYLES = {
@@ -90,7 +95,13 @@ function SkeletonCard() {
   return <div className="animate-pulse bg-zinc-800 rounded-2xl h-44" />;
 }
 
-export function RecommendationsGrid({ watchlist, topMovers }: Props) {
+export function RecommendationsGrid({
+  watchlist,
+  topMovers,
+  loading = false,
+  error = null,
+  onRetry,
+}: Props) {
   const [activeTab, setActiveTab] = useState<"watchlist" | "movers">(
     "watchlist"
   );
@@ -100,11 +111,11 @@ export function RecommendationsGrid({ watchlist, topMovers }: Props) {
 
   return (
     <div>
-      {/* Tab selector */}
-      <div className="flex gap-2 mb-4">
+      <div className="mb-4 flex gap-2">
         <button
+          type="button"
           onClick={() => setActiveTab("watchlist")}
-          className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${
+          className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
             activeTab === "watchlist"
               ? "bg-zinc-700 text-white"
               : "text-zinc-500 hover:text-zinc-300"
@@ -113,8 +124,9 @@ export function RecommendationsGrid({ watchlist, topMovers }: Props) {
           Watchlist Signals ({watchlist.length})
         </button>
         <button
+          type="button"
           onClick={() => setActiveTab("movers")}
-          className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${
+          className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
             activeTab === "movers"
               ? "bg-zinc-700 text-white"
               : "text-zinc-500 hover:text-zinc-300"
@@ -124,20 +136,55 @@ export function RecommendationsGrid({ watchlist, topMovers }: Props) {
         </button>
       </div>
 
-      {/* Grid */}
-      {isEmpty ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {error && (
+        <div className="mb-4 flex flex-col items-center justify-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950/80 px-4 py-8 text-center sm:flex-row sm:justify-between sm:text-left">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+            <div>
+              <p className="text-sm font-medium text-white">
+                Couldn&apos;t load recommendations
+              </p>
+              <p className="mt-1 text-xs text-zinc-500">{error}</p>
+            </div>
+          </div>
+          {onRetry && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onRetry}
+              className="shrink-0 border-zinc-600 bg-transparent text-white hover:bg-zinc-800"
+            >
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              Retry
+            </Button>
+          )}
+        </div>
+      )}
+
+      {loading && !error ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <SkeletonCard key={i} />
           ))}
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      ) : !error && isEmpty ? (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-4 py-12 text-center text-sm text-zinc-500">
+          No stock recommendations in this list yet.
+        </div>
+      ) : !error && activeStocks.length === 0 ? (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-4 py-12 text-center text-sm text-zinc-500">
+          {activeTab === "movers"
+            ? "No market movers in the feed right now."
+            : "No watchlist signals in the feed right now."}
+        </div>
+      ) : !error ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {activeStocks.map((stock) => (
             <RecommendationCard key={stock.symbol} stock={stock} />
           ))}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

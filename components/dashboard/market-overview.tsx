@@ -115,7 +115,7 @@ export function MarketOverview({
               className={`flex items-center justify-between rounded-lg p-2 cursor-pointer transition-colors ${
                 selectedPair === m.symbol
                   ? "bg-primary/10 ring-1 ring-primary"
-                  : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                  : "hover:bg-zinc-800/50"
               }`}
             >
               <div className="flex flex-col">

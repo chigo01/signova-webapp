@@ -39,7 +39,7 @@ export function DashboardCard({
             </span>
           )}
         </div>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm text-zinc-400">
           {description}
         </p>
       </div>

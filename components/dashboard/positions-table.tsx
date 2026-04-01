@@ -45,12 +45,12 @@ export function PositionsTable({ className }: { className?: string }) {
         className
       )}
     >
-      <div className="border-b border-border bg-zinc-50/50 px-4 py-3 dark:bg-zinc-900/50">
+      <div className="border-b border-border bg-zinc-900/50 px-4 py-3">
         <h3 className="font-semibold text-card-foreground">Open Positions</h3>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-50 text-zinc-500 dark:bg-zinc-900/50 dark:text-zinc-400">
+          <thead className="bg-zinc-900/50 text-zinc-400">
             <tr>
               <th className="px-4 py-3 font-medium">Symbol</th>
               <th className="px-4 py-3 font-medium">Type</th>
@@ -63,7 +63,7 @@ export function PositionsTable({ className }: { className?: string }) {
             {POSITIONS.map((pos) => (
               <tr
                 key={pos.id}
-                className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
+                className="transition-colors hover:bg-zinc-900/50"
               >
                 <td className="px-4 py-3 font-medium text-foreground">
                   {pos.symbol}

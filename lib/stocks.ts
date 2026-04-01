@@ -1,6 +1,5 @@
-import { cookies } from "next/headers";
-
 import { API_URL } from "@/lib/config";
+import { getAuthToken } from "@/lib/cookies";
 
 export interface StockRecommendation {
   symbol: string;
@@ -12,7 +11,7 @@ export interface StockRecommendation {
   low: number;
   sector: string;
   marketCap: number;
-  technicalSignal: "buy" | "sell" | "neutral";
+  technicalSignal: string;
   technicalCount: { buy: number; neutral: number; sell: number };
   adx: number;
   trending: boolean;
@@ -27,22 +26,19 @@ export interface StockRecommendationsResponse {
   lastUpdated: string;
 }
 
+/** GET /stocks/recommendations — requires auth in browser (static export). */
 export async function fetchStockRecommendations(): Promise<StockRecommendationsResponse> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("auth_token")?.value;
-
+  const token = getAuthToken();
   const res = await fetch(`${API_URL}/stocks/recommendations`, {
+    method: "GET",
     headers: {
       "Content-Type": "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),
     },
-    cache: "no-store",
   });
 
   if (!res.ok) {
-    throw new Error(
-      `Failed to fetch stock recommendations: ${res.statusText}`
-    );
+    throw new Error(`Failed to fetch stock recommendations: ${res.statusText}`);
   }
 
   return res.json();
