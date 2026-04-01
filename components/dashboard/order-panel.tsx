@@ -13,13 +13,13 @@ export function OrderPanel() {
     <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 text-card-foreground shadow-sm h-full">
       <div className="flex items-center justify-between border-b border-border pb-4">
         <h2 className="text-lg font-semibold">Order Entry</h2>
-        <div className="flex gap-1 rounded-md bg-zinc-100 p-1 dark:bg-zinc-800">
+        <div className="flex gap-1 rounded-md bg-zinc-800 p-1">
           <button
             onClick={() => setType("market")}
             className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
               type === "market"
-                ? "bg-white text-black shadow-sm dark:bg-black dark:text-white"
-                : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+                ? "bg-black text-white shadow-sm"
+                : "text-zinc-400 hover:text-zinc-50"
             }`}
           >
             Market
@@ -28,8 +28,8 @@ export function OrderPanel() {
             onClick={() => setType("limit")}
             className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
               type === "limit"
-                ? "bg-white text-black shadow-sm dark:bg-black dark:text-white"
-                : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+                ? "bg-black text-white shadow-sm"
+                : "text-zinc-400 hover:text-zinc-50"
             }`}
           >
             Limit
@@ -58,17 +58,17 @@ export function OrderPanel() {
         </div>
 
         <div className="grid grid-cols-2 gap-4 pt-2">
-          <div className="flex flex-col items-center justify-center rounded-lg bg-red-50 p-4 dark:bg-red-950/20">
-            <span className="text-xs text-red-600 dark:text-red-400">Bid</span>
-            <span className="text-2xl font-bold text-red-600 dark:text-red-400">
+          <div className="flex flex-col items-center justify-center rounded-lg bg-red-950/20 p-4">
+            <span className="text-xs text-red-400">Bid</span>
+            <span className="text-2xl font-bold text-red-400">
               1.0924<span className="text-sm align-top">5</span>
             </span>
           </div>
-          <div className="flex flex-col items-center justify-center rounded-lg bg-blue-50 p-4 dark:bg-blue-950/20">
-            <span className="text-xs text-blue-600 dark:text-blue-400">
+          <div className="flex flex-col items-center justify-center rounded-lg bg-blue-950/20 p-4">
+            <span className="text-xs text-blue-400">
               Ask
             </span>
-            <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            <span className="text-2xl font-bold text-blue-400">
               1.0925<span className="text-sm align-top">8</span>
             </span>
           </div>
@@ -86,13 +86,13 @@ export function OrderPanel() {
           </Button>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-y-2 text-sm text-zinc-500 dark:text-zinc-400">
+        <div className="mt-4 grid grid-cols-2 gap-y-2 text-sm text-zinc-400">
           <span>Margin Required:</span>
-          <span className="text-right font-mono text-zinc-900 dark:text-zinc-100">
+          <span className="text-right font-mono text-zinc-100">
             $218.50
           </span>
           <span>Spread:</span>
-          <span className="text-right font-mono text-zinc-900 dark:text-zinc-100">
+          <span className="text-right font-mono text-zinc-100">
             1.3 pips
           </span>
         </div>
