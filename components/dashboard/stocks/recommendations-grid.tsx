@@ -98,12 +98,9 @@ function RecommendationCard({ stock }: { stock: StockRecommendation }) {
         </span>
       </div>
 
-      {/* Range + confidence */}
-      <div className="flex items-center justify-between text-xs text-zinc-600">
-        <span>
-          H ${stock.high.toFixed(2)} / L ${stock.low.toFixed(2)}
-        </span>
-        <span>{stock.confidence}% confidence</span>
+      {/* Range */}
+      <div className="text-xs text-zinc-600">
+        H ${stock.high.toFixed(2)} / L ${stock.low.toFixed(2)}
       </div>
 
       {/* GPT reasons */}
