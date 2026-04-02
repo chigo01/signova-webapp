@@ -2,6 +2,8 @@ export type StockNode = {
   name: string;
   size: number;
   change: number;
+  /** From API technicalSignal — colors buy/sell cells */
+  signal?: string;
 };
 
 export type SectorNode = {
