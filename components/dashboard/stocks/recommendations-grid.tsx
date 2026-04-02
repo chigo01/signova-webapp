@@ -25,6 +25,13 @@ const BAR_COLORS = {
   SELL: "bg-red-500",
 } as const;
 
+function recommendationKey(
+  r: StockRecommendation["recommendation"]
+): keyof typeof REC_STYLES {
+  if (r === "BUY" || r === "SELL" || r === "HOLD") return r;
+  return "HOLD";
+}
+
 function RecommendationCard({ stock }: { stock: StockRecommendation }) {
   const changeColor =
     stock.changePercent >= 0 ? "text-emerald-400" : "text-red-400";
@@ -35,7 +42,7 @@ function RecommendationCard({ stock }: { stock: StockRecommendation }) {
       {/* Confidence bar at top of card */}
       <div className="absolute top-0 left-0 h-1 w-full bg-zinc-800">
         <div
-          className={`h-full ${BAR_COLORS[stock.recommendation]}`}
+          className={`h-full ${BAR_COLORS[recommendationKey(stock.recommendation)]}`}
           style={{ width: `${stock.confidence}%` }}
         />
       </div>
@@ -53,11 +60,31 @@ function RecommendationCard({ stock }: { stock: StockRecommendation }) {
           <span className="text-xs text-zinc-600">{stock.sector}</span>
         </div>
         <span
-          className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
-            REC_STYLES[stock.recommendation]
+          className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${
+            REC_STYLES[recommendationKey(stock.recommendation)]
           }`}
         >
           {stock.recommendation}
+        </span>
+      </div>
+
+      {/* Trend strength + technical mix */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-zinc-500">
+        <span>
+          ADX <span className="font-mono text-zinc-400">{stock.adx}</span>
+        </span>
+        {stock.trending ? (
+          <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300">
+            Trending
+          </span>
+        ) : (
+          <span className="rounded bg-zinc-800/60 px-1.5 py-0.5 text-zinc-500">
+            Range
+          </span>
+        )}
+        <span className="text-zinc-600">
+          Signals {stock.technicalCount.buy}B · {stock.technicalCount.neutral}N
+          · {stock.technicalCount.sell}S
         </span>
       </div>
 

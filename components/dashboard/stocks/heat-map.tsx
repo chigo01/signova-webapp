@@ -1,38 +1,59 @@
 "use client";
 
-import { useState } from "react";
+import type { ComponentProps } from "react";
+import { useMemo } from "react";
 import { Treemap, ResponsiveContainer } from "recharts";
-import { sectors } from "@/lib/marketData";
-import type { SectorNode } from "@/lib/marketData";
+import type { SectorNode, StockNode } from "@/lib/marketData";
+import type { StockRecommendation } from "@/lib/stocks";
+import { watchlistToHeatMapSectors } from "@/lib/stocks";
 
-const timeframes = ["D", "W", "M", "Y"];
-
-function getColor(change: number): string {
-  if (change > 2) return "#10b981"; // Emerald 500
-  if (change > 1) return "#059669"; // Emerald 600
-  if (change > 0) return "#064e3b"; // Emerald 900
-  if (change > -1) return "#881337"; // Rose 900
-  if (change > -2) return "#be123c"; // Rose 700
-  return "#e11d48"; // Rose 600
+/** Price change gradient when technical signal is neutral */
+function getColorByChange(change: number): string {
+  if (change > 2) return "#10b981";
+  if (change > 1) return "#059669";
+  if (change > 0) return "#064e3b";
+  if (change > -1) return "#881337";
+  if (change > -2) return "#be123c";
+  return "#e11d48";
 }
 
-interface TreemapContentProps {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  name?: string;
-  change?: number;
-  children?: unknown[];
+/** Prefer API technicalSignal for hue; intensity from changePercent */
+function getHeatMapFill(signal: string | undefined, change: number): string {
+  const s = (signal ?? "").toLowerCase();
+  if (s === "buy") {
+    if (change >= 2) return "#10b981";
+    if (change >= 0) return "#059669";
+    return "#047857";
+  }
+  if (s === "sell") {
+    if (change <= -2) return "#e11d48";
+    if (change <= 0) return "#be123c";
+    return "#f43f5e";
+  }
+  return getColorByChange(change);
 }
 
-function CustomContent(props: TreemapContentProps) {
+function CustomContent(
+  props: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    name?: string;
+    change?: number;
+    children?: unknown[];
+    payload?: StockNode;
+  }
+) {
   const { x, y, width, height, name, change, children } = props;
+  const payload = props.payload;
+  const leafName = payload?.name ?? name;
+  const leafChange = payload?.change ?? change ?? 0;
+  const signal = payload?.signal;
 
-  // Only render leaf nodes (stocks, not sector groups)
   if (children && (children as unknown[]).length > 0) return null;
 
-  const color = getColor(change ?? 0);
+  const color = getHeatMapFill(signal, leafChange);
 
   return (
     <g>
@@ -44,7 +65,7 @@ function CustomContent(props: TreemapContentProps) {
         fill={color}
         rx={0}
         ry={0}
-        stroke="#18181b" // zinc-950
+        stroke="#18181b"
         strokeWidth={1}
       />
       {width > 30 && height > 16 && (
@@ -58,7 +79,7 @@ function CustomContent(props: TreemapContentProps) {
           fontWeight={600}
           style={{ pointerEvents: "none" }}
         >
-          {name}
+          {leafName}
         </text>
       )}
     </g>
@@ -73,9 +94,11 @@ function SectorTreemap({
   className?: string;
 }) {
   return (
-    <div className={`flex flex-col ${className}`}>
-      <div className="mb-2 text-sm font-medium text-zinc-300">{data.name}</div>
-      <div className="flex-1 w-full overflow-hidden rounded-sm bg-zinc-800">
+    <div className={`flex min-h-0 flex-col ${className ?? ""}`}>
+      <div className="mb-2 shrink-0 text-sm font-medium text-zinc-300">
+        {data.name}
+      </div>
+      <div className="min-h-[140px] w-full flex-1 overflow-hidden rounded-sm bg-zinc-800">
         <ResponsiveContainer width="100%" height="100%">
           <Treemap
             data={data.children}
@@ -83,7 +106,9 @@ function SectorTreemap({
             aspectRatio={4 / 3}
             stroke="none"
             isAnimationActive={false}
-            content={<CustomContent x={0} y={0} width={0} height={0} />}
+            content={(p: unknown) => (
+              <CustomContent {...(p as ComponentProps<typeof CustomContent>)} />
+            )}
           />
         </ResponsiveContainer>
       </div>
@@ -91,53 +116,78 @@ function SectorTreemap({
   );
 }
 
-export function HeatMap() {
-  const [activeTimeframe, setActiveTimeframe] = useState("D");
+interface HeatMapProps {
+  watchlist: StockRecommendation[];
+  loading?: boolean;
+}
 
-  // Group sectors for layout
-  const mainSector = sectors[0]; // Information technology
-  const rightColumnSectors = sectors.slice(1, 3); // Financials, Consumer staples
+export function HeatMap({ watchlist, loading = false }: HeatMapProps) {
+  const sectorData = useMemo(() => {
+    if (watchlist.length === 0) return [];
+    return watchlistToHeatMapSectors(watchlist);
+  }, [watchlist]);
+
+  const hasData = sectorData.length > 0;
 
   return (
-    <div className="flex h-[500px] flex-col rounded-lg border border-[#1D1D1D] bg-[#121212] p-4">
-      <div className="mb-4 flex items-center justify-between shrink-0">
+    <div className="flex min-h-[500px] flex-col rounded-lg border border-[#1D1D1D] bg-[#121212] p-4">
+      <div className="mb-4 flex shrink-0 items-center justify-between">
         <h2 className="text-lg font-semibold text-white">Heat Map</h2>
+        <span className="text-[10px] text-zinc-500">
+          By sector · size = market cap · color = technical signal
+        </span>
       </div>
 
-      {/* Timeframe selector */}
-      <div className="mb-4 shrink-0">
-        <div className="mb-2 text-xs text-zinc-400">Time frame</div>
-        <div className="flex gap-2">
-          {timeframes.map((tf) => (
-            <button
-              key={tf}
-              onClick={() => setActiveTimeframe(tf)}
-              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
-                activeTimeframe === tf
-                  ? "bg-zinc-700 text-white"
-                  : "bg-zinc-800 text-zinc-400 hover:text-white"
-              }`}
-            >
-              {tf}
-            </button>
-          ))}
+      {loading ? (
+        <div className="flex flex-1 flex-col gap-3 py-4">
+          <div className="h-40 animate-pulse rounded-lg bg-zinc-800" />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="h-32 animate-pulse rounded-lg bg-zinc-800" />
+            <div className="h-32 animate-pulse rounded-lg bg-zinc-800" />
+          </div>
         </div>
-      </div>
-
-      {/* Treemap Grid Layout */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0">
-        {/* Left Column (Main Sector) */}
-        <div className="lg:col-span-7 h-full">
-          <SectorTreemap data={mainSector} className="h-full" />
+      ) : !hasData ? (
+        <div className="flex flex-1 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950/40 px-4 py-12 text-center text-sm text-zinc-500">
+          Load stock recommendations to see sector heat map (market cap and
+          signals).
         </div>
-
-        {/* Right Column (Other Sectors) */}
-        <div className="lg:col-span-5 h-full flex flex-col gap-4">
-          {rightColumnSectors.map((sector) => (
-            <SectorTreemap key={sector.name} data={sector} className="h-1/2" />
-          ))}
+      ) : (
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto lg:grid-cols-12">
+          {sectorData.length <= 1 ? (
+            <div className="h-[min(360px,50vh)] w-full lg:col-span-12">
+              {sectorData[0] && (
+                <SectorTreemap data={sectorData[0]} className="h-full" />
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="h-[min(360px,50vh)] w-full lg:col-span-7">
+                <SectorTreemap data={sectorData[0]} className="h-full" />
+              </div>
+              <div className="flex min-h-[360px] flex-col gap-4 lg:col-span-5">
+                {sectorData.slice(1, 3).map((sector) => (
+                  <SectorTreemap
+                    key={sector.name}
+                    data={sector}
+                    className="min-h-0 flex-1"
+                  />
+                ))}
+              </div>
+              {sectorData.length > 3 && (
+                <div className="col-span-full grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {sectorData.slice(3).map((sector) => (
+                    <SectorTreemap
+                      key={sector.name}
+                      data={sector}
+                      className="min-h-[200px]"
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 }

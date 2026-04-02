@@ -99,7 +99,7 @@ export function StocksPageContent() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="lg:col-span-4">
-          <HeatMap />
+          <HeatMap watchlist={data.watchlist} loading={loading} />
         </div>
         <div className="lg:col-span-4">
           <TopNewsList />
