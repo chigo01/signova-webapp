@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,7 +39,10 @@ function RecommendationCard({ stock }: { stock: StockRecommendation }) {
   const changePrefix = stock.changePercent >= 0 ? "↑" : "↓";
 
   return (
-    <div className="relative flex flex-col gap-2 overflow-hidden rounded-lg border border-[#1D1D1D] bg-[#121212] p-4">
+    <Link
+      href={`/dashboard/stock-detail?ticker=${encodeURIComponent(stock.symbol)}`}
+      className="relative flex flex-col gap-2 overflow-hidden rounded-lg border border-[#1D1D1D] bg-[#121212] p-4 transition-colors hover:border-zinc-600 hover:bg-[#161616]"
+    >
       {/* Confidence bar at top of card */}
       <div className="absolute top-0 left-0 h-1 w-full bg-zinc-800">
         <div
@@ -111,7 +115,7 @@ function RecommendationCard({ stock }: { stock: StockRecommendation }) {
           </li>
         ))}
       </ul>
-    </div>
+    </Link>
   );
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { StockRecommendation } from "@/lib/stocks";
 
 interface Props {
@@ -37,7 +38,14 @@ export function TopGainers({ stocks }: Props) {
                   key={stock.symbol}
                   className="border-b border-zinc-800/50 last:border-0"
                 >
-                  <td className="py-3 text-sm text-white">{stock.symbol}</td>
+                  <td className="py-3 text-sm text-white">
+                    <Link
+                      href={`/dashboard/stock-detail?ticker=${encodeURIComponent(stock.symbol)}`}
+                      className="font-medium text-white underline-offset-2 hover:underline"
+                    >
+                      {stock.symbol}
+                    </Link>
+                  </td>
                   <td className="py-3 text-sm text-zinc-400">{stock.name}</td>
                   <td className="py-3 pr-4 text-right text-sm text-white">
                     ${stock.price.toFixed(2)}
