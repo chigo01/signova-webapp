@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -104,62 +105,70 @@ export function StockOptions() {
         ))}
       </div>
 
-      <div
-        ref={trackRef}
-        onMouseEnter={() => {
-          isHoveringRef.current = true;
-        }}
-        onMouseLeave={() => {
-          isHoveringRef.current = false;
-        }}
-        className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-      >
-        <div className="grid grid-flow-col grid-rows-2 auto-cols-[210px] gap-2.5">
-          {(stocks.length > 6 ? autoScrollItems : stocks).map((stock, i) => {
-            const isPositive = stock.changePercent >= 0;
-            const percentText = `${isPositive ? "+" : ""}${stock.changePercent.toFixed(2)}%`;
-            const changeText = `${isPositive ? "+" : ""}${stock.change.toFixed(2)}`;
-            return (
-              <div
-                key={`${stock.symbol}-${i}`}
-                className="w-[210px] shrink-0 rounded-[4px] bg-[#1E1E1E] p-[10px]"
-              >
-                <div className="flex items-start gap-2">
-                  <div
-                    className={cn(
-                      "mt-0.5 h-7 w-1 shrink-0 rounded-full",
-                      barColor(stock.technicalSignal, stock.changePercent)
-                    )}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="truncate text-[12px] font-medium leading-tight text-zinc-300">
-                        {stock.symbol}
-                      </span>
-                      <span className="shrink-0 text-[12px] text-zinc-400">
-                        ${stock.price.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-2 text-[11px]">
-                      <span className={isPositive ? "text-[#2DD4BF]" : "text-red-500"}>
-                        {changeText}
-                      </span>
-                      <span className={isPositive ? "text-[#2DD4BF]" : "text-red-500"}>
-                        {percentText}
-                      </span>
+      {isLoading ? (
+        <div className="flex min-h-[120px] flex-col items-center justify-center gap-3 rounded-lg border border-zinc-800/80 bg-[#161616] py-10">
+          <Loader2 className="h-7 w-7 animate-spin text-zinc-500" aria-hidden />
+          <p className="text-xs text-zinc-500">Loading stock options…</p>
+        </div>
+      ) : (
+        <div
+          ref={trackRef}
+          onMouseEnter={() => {
+            isHoveringRef.current = true;
+          }}
+          onMouseLeave={() => {
+            isHoveringRef.current = false;
+          }}
+          className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        >
+          <div className="grid grid-flow-col grid-rows-2 auto-cols-[210px] gap-2.5">
+            {(stocks.length > 6 ? autoScrollItems : stocks).map((stock, i) => {
+              const isPositive = stock.changePercent >= 0;
+              const percentText = `${isPositive ? "+" : ""}${stock.changePercent.toFixed(2)}%`;
+              const changeText = `${isPositive ? "+" : ""}${stock.change.toFixed(2)}`;
+              return (
+                <Link
+                  key={`${stock.symbol}-${i}`}
+                  href={`/dashboard/stock-detail?ticker=${encodeURIComponent(stock.symbol)}`}
+                  className="block w-[210px] shrink-0 rounded-[4px] bg-[#1E1E1E] p-[10px] transition-colors hover:bg-[#252525]"
+                >
+                  <div className="flex items-start gap-2">
+                    <div
+                      className={cn(
+                        "mt-0.5 h-7 w-1 shrink-0 rounded-full",
+                        barColor(stock.technicalSignal, stock.changePercent)
+                      )}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="truncate text-[12px] font-medium leading-tight text-zinc-300">
+                          {stock.symbol}
+                        </span>
+                        <span className="shrink-0 text-[12px] text-zinc-400">
+                          ${stock.price.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-2 text-[11px]">
+                        <span className={isPositive ? "text-[#2DD4BF]" : "text-red-500"}>
+                          {changeText}
+                        </span>
+                        <span className={isPositive ? "text-[#2DD4BF]" : "text-red-500"}>
+                          {percentText}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </Link>
+              );
+            })}
+            {stocks.length === 0 && (
+              <div className="rounded-[4px] bg-[#1E1E1E] px-4 py-3 text-xs text-zinc-500">
+                No stock options available.
               </div>
-            );
-          })}
-          {!isLoading && stocks.length === 0 && (
-            <div className="rounded-[4px] bg-[#1E1E1E] px-4 py-3 text-xs text-zinc-500">
-              No stock options available.
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
