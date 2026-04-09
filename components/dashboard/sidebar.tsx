@@ -143,7 +143,13 @@ export function Sidebar() {
       </div>
 
       <div className="shrink-0 border-t border-zinc-800 p-4">
-        <div className="flex items-center gap-3 rounded-lg bg-zinc-900 p-3">
+        <Link
+          href="/dashboard/settings"
+          className={cn(
+            "flex items-center gap-3 rounded-lg bg-zinc-900 p-3 transition-colors hover:bg-zinc-800",
+            pathname === "/dashboard/settings" && "ring-1 ring-zinc-700"
+          )}
+        >
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-sm font-medium text-white">
             {hasStoredProfile ? initialsFromName(userName) : "?"}
           </div>
@@ -153,7 +159,7 @@ export function Sidebar() {
             </span>
             <span className="truncate text-xs text-zinc-500">{userEmail}</span>
           </div>
-        </div>
+        </Link>
         <button
           type="button"
           onClick={handleLogout}
