@@ -2,12 +2,11 @@ import { Signal } from "@/types/signal";
 import { API_URL } from "@/lib/config";
 import { getAuthToken } from "./cookies";
 
-interface SignalsResponse {
+interface WinRateResponse {
   success: boolean;
-  date: string;
-  signals: Signal[];
-  count: number;
+  winRate: number;
   totalSignals: number;
+  takeProfitHits: number;
 }
 
 export async function fetchApprovedSignals(): Promise<Signal[]> {
@@ -78,7 +77,24 @@ export async function playSignal(signal: Signal): Promise<void> {
 
 /** GET /signals/history?page=&limit= — paginated list of plays for the authenticated user. */
 export interface SignalHistoryResponse {
-  data: import("@/types/signal").SignalPlay[];
+  items: import("@/types/signal").ApprovedSignalsHistory[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+interface SignalHistoryApiItem {
+  date: string;
+  sourceCollection: string;
+  signal: Signal;
+}
+
+interface SignalHistoryApiResponse {
+  success: boolean;
+  items: SignalHistoryApiItem[];
   pagination: {
     page: number;
     limit: number;
@@ -107,7 +123,60 @@ export async function fetchSignalHistory(
     throw new Error("Failed to fetch signal history");
   }
 
-  return res.json();
+  const data: SignalHistoryApiResponse = await res.json();
+
+  if (!data.success || !Array.isArray(data.items)) {
+    throw new Error("Invalid signal history response");
+  }
+
+  const items = data.items.map((item) => {
+    const signal = item.signal;
+    const signalType: "buy" | "sell" =
+      signal.direction === "BUY" ? "buy" : "sell";
+
+    return {
+      _id: signal._id,
+      userId: "",
+      signalId: signal._id,
+      symbol: signal.pair,
+      signalType,
+      entryPrice: signal.entryPrice,
+      targetPrice: signal.exitTargets.takeProfit1,
+      stopLoss: signal.exitTargets.stopLoss,
+      playedAt: signal.timestamp,
+      tradeOutcome: signal.tradeOutcome ?? "PENDING",
+      createdAt: signal.timestamp,
+      updatedAt: signal.timestamp,
+    };
+  });
+
+  return {
+    items,
+    pagination: data.pagination,
+  };
+}
+
+export async function fetchWinRate(): Promise<number> {
+  const token = getAuthToken();
+  const res = await fetch(`${API_URL}/signals/win-rate`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch win rate: ${res.statusText}`);
+  }
+
+  const data: WinRateResponse = await res.json();
+
+  if (!data.success || typeof data.winRate !== "number") {
+    throw new Error("Invalid win rate response");
+  }
+
+  return data.winRate;
 }
 
 // FCS API Response Types
@@ -190,6 +259,14 @@ export interface ChartDataPoint {
   close: number;
 }
 
+interface FcsApiCandle {
+  o: string | number;
+  h: string | number;
+  l: string | number;
+  c: string | number;
+  tm: number;
+}
+
 export async function fetchPairSignals(
   pair: string,
   period: string = "1h",
@@ -230,7 +307,7 @@ export async function fetchPairSignals(
     }
 
     // FCS API history returns array of candles in response
-    const candles = data.signals.response;
+    const candles = data.signals.response as unknown as FcsApiCandle[];
 
     if (!Array.isArray(candles) || candles.length === 0) {
       console.warn("Candles is not an array or is empty:", candles);
@@ -238,18 +315,18 @@ export async function fetchPairSignals(
     }
 
     // Transform each candle to our chart format
-    const chartData: ChartDataPoint[] = candles.map((candle: any) => {
+    const chartData: ChartDataPoint[] = candles.map((candle: FcsApiCandle) => {
       // Handle both timestamp formats (Unix timestamp or milliseconds)
-      const timestamp = candle.tm * 1000; // Assuming tm is in seconds
-      const date = new Date(timestamp);
+        const timestamp = candle.tm * 1000; // Assuming tm is in seconds
+        const date = new Date(timestamp);
 
-      return {
-        time: date.toISOString().split("T")[0],
-        open: parseFloat(candle.o),
-        high: parseFloat(candle.h),
-        low: parseFloat(candle.l),
-        close: parseFloat(candle.c),
-      };
+        return {
+          time: date.toISOString().split("T")[0],
+          open: parseFloat(String(candle.o)),
+          high: parseFloat(String(candle.h)),
+          low: parseFloat(String(candle.l)),
+          close: parseFloat(String(candle.c)),
+        };
     });
 
     // Sort by time ascending (oldest first)

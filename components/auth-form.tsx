@@ -84,7 +84,9 @@ export function AuthForm({ type }: AuthFormProps) {
       setStep("otp");
     } catch (error) {
       console.error(error);
-      alert("Failed to send OTP. Please try again.");
+   
+   alert("Failed to send OTP. Please try again.");
+
     } finally {
       setIsLoading(false);
     }

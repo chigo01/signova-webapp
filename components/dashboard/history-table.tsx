@@ -1,9 +1,39 @@
-import { SignalPlay } from "@/types/signal";
+import { ApprovedSignalsHistory } from "@/types/signal";
 import { ArrowDown, ArrowUp, Loader2 } from "lucide-react";
 
 interface HistoryTableProps {
-  data: SignalPlay[];
+  data: ApprovedSignalsHistory[];
   isLoading: boolean;
+}
+
+function getOutcomeMeta(outcome?: ApprovedSignalsHistory["tradeOutcome"]) {
+  switch (outcome) {
+    case "TP_HIT":
+      return {
+        label: "Take Profit Hit",
+        className: "text-green-600/80",
+      };
+    case "SL_HIT":
+      return {
+        label: "Stop Loss Hit",
+        className: "text-red-600/80",
+      };
+    case "BREAKEVEN":
+      return {
+        label: "Breakeven",
+        className: "text-sky-400",
+      };
+    case "CANCELLED":
+      return {
+        label: "Cancelled",
+        className: "text-zinc-300",
+      };
+    default:
+      return {
+        label: "Pending",
+        className: "text-amber-600/80",
+      };
+  }
 }
 
 export function HistoryTable({ data, isLoading }: HistoryTableProps) {
@@ -34,6 +64,7 @@ export function HistoryTable({ data, isLoading }: HistoryTableProps) {
               <th className="px-4 py-3 font-medium">Entry Price</th>
               <th className="px-4 py-3 font-medium">Target</th>
               <th className="px-4 py-3 font-medium">Stop Loss</th>
+              <th className="px-4 py-3 font-medium">Played Out</th>
               <th className="px-4 py-3 font-medium">Played At</th>
             </tr>
           </thead>
@@ -42,6 +73,7 @@ export function HistoryTable({ data, isLoading }: HistoryTableProps) {
               const isBuy = play.signalType === "buy";
               const typeColor = isBuy ? "text-green-500" : "text-red-500";
               const Icon = isBuy ? ArrowUp : ArrowDown;
+              const outcome = getOutcomeMeta(play.tradeOutcome);
 
               return (
                 <tr
@@ -67,6 +99,11 @@ export function HistoryTable({ data, isLoading }: HistoryTableProps) {
                   </td>
                   <td className="px-4 py-3 font-mono text-red-600/80">
                     {play.stopLoss}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs font-semibold ${outcome.className}`}>
+                      {outcome.label}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {new Date(play.playedAt).toLocaleString(undefined, {

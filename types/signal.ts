@@ -65,10 +65,11 @@ export interface Signal {
     approvedBy?: string;
     rejectionReason?: string;
   };
+  tradeOutcome?: "TP_HIT" | "SL_HIT" | "PENDING" | "BREAKEVEN" | "CANCELLED";
 }
 
-/** Row from GET /signals/history (signal play records). */
-export interface SignalPlay {
+/** Row from GET /signals/history (approved signals history records). */
+export interface ApprovedSignalsHistory {
   _id: string;
   userId: string;
   signalId: string;
@@ -78,6 +79,7 @@ export interface SignalPlay {
   targetPrice: number;
   stopLoss: number;
   playedAt: string;
+  tradeOutcome?: "TP_HIT" | "SL_HIT" | "PENDING" | "BREAKEVEN" | "CANCELLED";
   createdAt: string;
   updatedAt: string;
   __v?: number;

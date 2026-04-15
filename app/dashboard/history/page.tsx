@@ -3,13 +3,13 @@
 import { HistoryTable } from "@/components/dashboard/history-table";
 import { Button } from "@/components/ui/button";
 import { fetchSignalHistory } from "@/lib/signals";
-import { SignalPlay } from "@/types/signal";
+import { ApprovedSignalsHistory } from "@/types/signal";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 export default function HistoryPage() {
-  const [history, setHistory] = useState<SignalPlay[]>([]);
+  const [history, setHistory] = useState<ApprovedSignalsHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -19,7 +19,7 @@ export default function HistoryPage() {
     try {
       setIsLoading(true);
       const res = await fetchSignalHistory(page, LIMIT);
-      setHistory(res.data);
+      setHistory(res.items);
       setTotalPages(res.pagination.totalPages);
       setCurrentPage(res.pagination.page);
     } catch (error) {
