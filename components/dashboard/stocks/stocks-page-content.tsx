@@ -32,14 +32,13 @@ const emptyData: StockRecommendationsResponse = {
 
 function filterStocks(
   list: StockRecommendation[],
-  query: string
+  query: string,
 ): StockRecommendation[] {
   const q = query.trim().toLowerCase();
   if (!q) return list;
   return list.filter(
     (s) =>
-      s.symbol.toLowerCase().includes(q) ||
-      s.name.toLowerCase().includes(q)
+      s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q),
   );
 }
 
@@ -66,7 +65,7 @@ export function StocksPageContent() {
     } catch (e) {
       console.error(e);
       setError(
-        e instanceof Error ? e.message : "Couldn’t load stock recommendations."
+        e instanceof Error ? e.message : "Couldn’t load stock recommendations.",
       );
       setData(emptyData);
     } finally {
@@ -82,9 +81,7 @@ export function StocksPageContent() {
     const raw = searchQuery.trim().toUpperCase();
     const ticker = raw.replace(/[^A-Z0-9.-]/g, "");
     if (!ticker) return;
-    router.push(
-      `/dashboard/stock-detail?ticker=${encodeURIComponent(ticker)}`
-    );
+    router.push(`/dashboard/stock-detail?ticker=${encodeURIComponent(ticker)}`);
   }, [router, searchQuery]);
 
   return (
@@ -109,9 +106,9 @@ export function StocksPageContent() {
               className="w-64 border-0 bg-zinc-900 pl-10 text-white placeholder:text-zinc-500"
             />
           </div>
-          <Button className="bg-white text-black hover:bg-zinc-200">
+          {/*<Button className="bg-white text-black hover:bg-zinc-200">
             View my stocks
-          </Button>
+          </Button>*/}
         </div>
       </div>
 
