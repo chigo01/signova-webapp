@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3000",
-    "build": "next build",
+    "sync:tradingview": "node ./scripts/sync-tradingview-assets.mjs",
+    "dev": "npm run sync:tradingview && next dev -p 3000",
+    "build": "npm run sync:tradingview && next build",
     "start": "next start",
     "lint": "eslint"
   },

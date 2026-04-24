@@ -15,8 +15,11 @@ import { Signal } from "@/types/signal";
 import { fetchApprovedSignals, playSignal } from "@/lib/signals";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { pairToTradingViewSymbol } from "@/lib/tradingview-symbol";
-import TradingViewWidget from "@/components/signals/tradingview-widget";
+import {
+  normalizeForexSymbol,
+  signalTimeframeToResolution,
+} from "@/lib/forex-analysis";
+import ForexAdvancedChart from "@/components/signals/forex-advanced-chart";
 
 function formatLevelValue(value: number): string {
   // Keep signal levels compact so they never overflow the TP/SL boxes.
@@ -130,7 +133,8 @@ export default function SignalVaultPage() {
   const [isLoadingSignals, setIsLoadingSignals] = useState(true);
   /** Set when fetch throws so we show the same refresh affordances as empty state */
   const [signalsLoadError, setSignalsLoadError] = useState<string | null>(null);
-  const [chartSymbol, setChartSymbol] = useState("OANDA:EURUSD");
+  const [chartSymbol, setChartSymbol] = useState("EURUSD");
+  const [chartInterval, setChartInterval] = useState("1D");
 
   const loadSignals = useCallback(async () => {
     try {
@@ -155,9 +159,34 @@ export default function SignalVaultPage() {
     loadSignals();
   }, [loadSignals]);
 
+  useEffect(() => {
+    if (signals.length === 0) return;
+
+    setChartSymbol((currentSymbol) =>
+      currentSymbol === "EURUSD"
+        ? normalizeForexSymbol(signals[0].pair)
+        : currentSymbol
+    );
+    setChartInterval((currentInterval) =>
+      currentInterval === "1D"
+        ? signalTimeframeToResolution(signals[0].timeframe)
+        : currentInterval
+    );
+  }, [signals]);
+
   const handleSignalPlay = (signal: Signal) => {
-    setChartSymbol(pairToTradingViewSymbol(signal.pair));
+    setChartSymbol(normalizeForexSymbol(signal.pair));
+    setChartInterval(signalTimeframeToResolution(signal.timeframe));
   };
+
+  const normalizedSearch = searchQuery.trim()
+    ? normalizeForexSymbol(searchQuery)
+    : "";
+  const visibleSignals = normalizedSearch
+    ? signals.filter((signal) =>
+        normalizeForexSymbol(signal.pair).includes(normalizedSearch)
+      )
+    : signals;
 
   const signalsPanel = (
     <>
@@ -232,8 +261,18 @@ export default function SignalVaultPage() {
               Refresh
             </Button>
           </div>
+        ) : visibleSignals.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 text-center text-zinc-500 sm:py-12">
+            <Search className="mb-3 h-8 w-8 text-zinc-600" />
+            <p className="mb-1 text-sm font-medium text-zinc-300">
+              No pairs match that search
+            </p>
+            <p className="text-xs text-zinc-600">
+              Try a different pair code like EURUSD or GBPJPY.
+            </p>
+          </div>
         ) : (
-          signals.map((signal) => (
+          visibleSignals.map((signal) => (
             <VaultSignalCard
               key={signal._id}
               signal={signal}
@@ -255,7 +294,7 @@ export default function SignalVaultPage() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
           <input
             type="text"
-            placeholder="USDT/GOLD"
+            placeholder="EUR/USD"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="h-9 w-56 rounded-full bg-zinc-900 pl-10 pr-4 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-700"
@@ -283,8 +322,13 @@ export default function SignalVaultPage() {
         {/* Chart column */}
         <section className="flex min-h-0 flex-col lg:h-full lg:min-h-0 lg:flex-1">
           <div className="relative flex min-h-0 flex-1 flex-col px-2 pb-2 pt-1 lg:h-full lg:min-h-0">
-            <div className="h-[min(42vh,380px)] max-h-[420px] min-h-[280px] w-full flex-1 sm:h-[min(50vh,480px)] sm:max-h-[520px] lg:h-full lg:max-h-[760px] lg:min-h-[400px]">
-              <TradingViewWidget symbol={chartSymbol} interval="D" />
+            <div className="h-[min(58vh,620px)] min-h-[340px] w-full flex-1 sm:h-[min(64vh,720px)] lg:h-full lg:min-h-[520px]">
+              <ForexAdvancedChart
+                symbol={chartSymbol}
+                interval={chartInterval}
+                theme="dark"
+                analysisPreset="approved-signal"
+              />
             </div>
           </div>
 
