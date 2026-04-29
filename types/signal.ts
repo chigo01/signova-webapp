@@ -65,7 +65,28 @@ export interface Signal {
     approvedBy?: string;
     rejectionReason?: string;
   };
-  tradeOutcome?: "TP_HIT" | "SL_HIT" | "PENDING" | "BREAKEVEN" | "CANCELLED";
+  tradeOutcome?:
+    | "TP_HIT"
+    | "TP1_HIT"
+    | "TP2_HIT"
+    | "SL_HIT"
+    | "PENDING"
+    | "REVIEW_REQUIRED"
+    | "BREAKEVEN"
+    | "CANCELLED";
+  engine?: {
+    candidateId?: string;
+    eliteRank?: number;
+    approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
+    decision?: {
+      decision: "APPROVED" | "ADJUSTED" | "REJECTED" | "ENHANCED";
+      confidence: number;
+      qualityScore: number;
+      reasons: string[];
+      requiredAdjustments: string[];
+      rejectionReasons: string[];
+    };
+  };
 }
 
 /** Row from GET /signals/history (approved signals history records). */
@@ -79,7 +100,15 @@ export interface ApprovedSignalsHistory {
   targetPrice: number;
   stopLoss: number;
   playedAt: string;
-  tradeOutcome?: "TP_HIT" | "SL_HIT" | "PENDING" | "BREAKEVEN" | "CANCELLED";
+  tradeOutcome?:
+    | "TP_HIT"
+    | "TP1_HIT"
+    | "TP2_HIT"
+    | "SL_HIT"
+    | "PENDING"
+    | "REVIEW_REQUIRED"
+    | "BREAKEVEN"
+    | "CANCELLED";
   createdAt: string;
   updatedAt: string;
   __v?: number;

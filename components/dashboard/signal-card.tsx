@@ -23,6 +23,10 @@ export function SignalCard({ signal, onClick }: SignalCardProps) {
   const directionColor = isBuy ? "text-green-500" : "text-red-500";
   const directionBg = isBuy ? "bg-green-500/10" : "bg-red-500/10";
   const Icon = isBuy ? ArrowUp : ArrowDown;
+  const confidencePercent =
+    signal.confidence <= 1
+      ? Math.round(signal.confidence * 100)
+      : Math.round(signal.confidence);
 
   const handlePlay = async () => {
     try {
@@ -58,7 +62,7 @@ export function SignalCard({ signal, onClick }: SignalCardProps) {
         <div className="flex flex-col items-end">
           <span className="text-xs text-muted-foreground">Confidence</span>
           <span className="font-mono font-bold text-primary">
-            {signal.confidence}%
+            {confidencePercent}%
           </span>
         </div>
       </div>
