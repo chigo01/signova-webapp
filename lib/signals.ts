@@ -9,6 +9,142 @@ interface WinRateResponse {
   takeProfitHits: number;
 }
 
+type SignalDirection = Signal["direction"];
+
+type ApiSignal = Partial<Signal> & {
+  engine?: {
+    monitorKey?: string;
+  };
+  rawSignal?: Partial<Signal>;
+  activeSignal?: Partial<Signal>;
+  legacySignal?: Partial<Signal>;
+};
+
+const fallbackTechnicalIndicators: Signal["technicalIndicators"] = {
+  rsi: 0,
+  macd: {
+    line: 0,
+    signal: 0,
+    histogram: 0,
+  },
+  movingAverages: {
+    sma20: 0,
+    sma50: 0,
+    ema12: 0,
+    ema26: 0,
+  },
+  bollinger: {
+    upper: 0,
+    middle: 0,
+    lower: 0,
+  },
+  stochastic: {
+    k: 0,
+    d: 0,
+  },
+};
+
+const fallbackSupportResistance: Signal["supportResistance"] = {
+  resistance: [],
+  support: [],
+  currentLevel: "neutral",
+};
+
+function parseMonitorKey(monitorKey?: string): Partial<Signal> {
+  if (!monitorKey) return {};
+
+  const [pair, direction, timeframe, entryPrice, timestamp] =
+    monitorKey.split("|");
+  const parsedEntryPrice = Number(entryPrice);
+
+  return {
+    ...(pair && { pair }),
+    ...(direction === "BUY" || direction === "SELL" || direction === "HOLD"
+      ? { direction }
+      : {}),
+    ...(timeframe && { timeframe }),
+    ...(Number.isFinite(parsedEntryPrice) && { entryPrice: parsedEntryPrice }),
+    ...(timestamp && { timestamp }),
+  };
+}
+
+function normalizeSignal(signal: ApiSignal): Signal | null {
+  const rawSignal = signal.rawSignal ?? signal.activeSignal ?? {};
+  const legacySignal = signal.legacySignal ?? {};
+  const monitorSignal = parseMonitorKey(signal.engine?.monitorKey);
+
+  const pair =
+    signal.pair ?? rawSignal.pair ?? legacySignal.pair ?? monitorSignal.pair;
+  const direction =
+    signal.direction ??
+    rawSignal.direction ??
+    legacySignal.direction ??
+    monitorSignal.direction;
+  const timeframe =
+    signal.timeframe ??
+    rawSignal.timeframe ??
+    legacySignal.timeframe ??
+    monitorSignal.timeframe;
+  const entryPrice =
+    signal.entryPrice ??
+    rawSignal.entryPrice ??
+    legacySignal.entryPrice ??
+    monitorSignal.entryPrice;
+  const exitTargets =
+    signal.exitTargets ?? rawSignal.exitTargets ?? legacySignal.exitTargets;
+
+  if (!signal._id || !pair || !direction || !timeframe || !exitTargets) {
+    return null;
+  }
+
+  const riskAssessment = {
+    positionSize: 0,
+    maxDrawdown: 0,
+    ...(rawSignal.riskAssessment ?? {}),
+    ...(legacySignal.riskAssessment ?? {}),
+    ...(signal.riskAssessment ?? {}),
+  };
+
+  return {
+    _id: signal._id,
+    pair,
+    direction: direction as SignalDirection,
+    timeframe,
+    confidence:
+      signal.confidence ?? rawSignal.confidence ?? legacySignal.confidence ?? 0,
+    strength: signal.strength ?? rawSignal.strength ?? legacySignal.strength ?? 0,
+    entryPrice: entryPrice ?? 0,
+    exitTargets,
+    technicalIndicators:
+      signal.technicalIndicators ??
+      rawSignal.technicalIndicators ??
+      legacySignal.technicalIndicators ??
+      fallbackTechnicalIndicators,
+    supportResistance:
+      signal.supportResistance ??
+      rawSignal.supportResistance ??
+      legacySignal.supportResistance ??
+      fallbackSupportResistance,
+    riskAssessment: {
+      ...riskAssessment,
+      stopLoss: riskAssessment.stopLoss ?? exitTargets.stopLoss,
+      takeProfit: riskAssessment.takeProfit ?? exitTargets.takeProfit1,
+      riskRewardRatio: riskAssessment.riskRewardRatio ?? 0,
+    },
+    reasoning:
+      signal.reasoning ?? rawSignal.reasoning ?? legacySignal.reasoning ?? [],
+    timestamp:
+      signal.timestamp ??
+      rawSignal.timestamp ??
+      legacySignal.timestamp ??
+      monitorSignal.timestamp ??
+      "",
+    screenshot: signal.screenshot ?? rawSignal.screenshot ?? legacySignal.screenshot,
+    tradeOutcome:
+      signal.tradeOutcome ?? rawSignal.tradeOutcome ?? legacySignal.tradeOutcome,
+  };
+}
+
 export async function fetchApprovedSignals(): Promise<Signal[]> {
   try {
     const token = getAuthToken();
@@ -31,16 +167,17 @@ export async function fetchApprovedSignals(): Promise<Signal[]> {
     const data = await res.json();
 
     // Handle both array and object responses from the API
+    let signals: ApiSignal[] = [];
     if (Array.isArray(data)) {
       // If it's an array, get the first item's signals
       const firstItem = data[0];
-      return firstItem?.signals || [];
+      signals = firstItem?.signals || [];
     } else if (data && typeof data === "object") {
       // If it's an object, get signals directly
-      return data.signals || [];
+      signals = data.signals || [];
     }
 
-    return [];
+    return signals.map(normalizeSignal).filter((signal) => signal !== null);
   } catch (error) {
     console.error("Error fetching approved signals:", error);
     // Return empty array on error to allow UI to show "try again" rather than crashing
