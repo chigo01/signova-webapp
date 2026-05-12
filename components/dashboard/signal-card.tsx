@@ -23,6 +23,7 @@ export function SignalCard({ signal, onClick }: SignalCardProps) {
   const directionColor = isBuy ? "text-green-500" : "text-red-500";
   const directionBg = isBuy ? "bg-green-500/10" : "bg-red-500/10";
   const Icon = isBuy ? ArrowUp : ArrowDown;
+  const strictEligibility = signal.engine?.eliteEligibility?.after;
 
   const handlePlay = async () => {
     try {
@@ -60,6 +61,12 @@ export function SignalCard({ signal, onClick }: SignalCardProps) {
           <span className="font-mono font-bold text-primary">
             {signal.confidence}%
           </span>
+          {strictEligibility && (
+            <span className="mt-1 text-[11px] text-muted-foreground">
+              {strictEligibility.visibleLensPasses}/{strictEligibility.visibleLensTotal} ·{" "}
+              {Math.round(strictEligibility.internalCheckPassRate * 100)}%
+            </span>
+          )}
         </div>
       </div>
 

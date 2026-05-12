@@ -12,9 +12,7 @@ interface WinRateResponse {
 type SignalDirection = Signal["direction"];
 
 type ApiSignal = Partial<Signal> & {
-  engine?: {
-    monitorKey?: string;
-  };
+  engine?: Signal["engine"];
   rawSignal?: Partial<Signal>;
   activeSignal?: Partial<Signal>;
   legacySignal?: Partial<Signal>;
@@ -142,6 +140,7 @@ function normalizeSignal(signal: ApiSignal): Signal | null {
     screenshot: signal.screenshot ?? rawSignal.screenshot ?? legacySignal.screenshot,
     tradeOutcome:
       signal.tradeOutcome ?? rawSignal.tradeOutcome ?? legacySignal.tradeOutcome,
+    engine: signal.engine,
   };
 }
 

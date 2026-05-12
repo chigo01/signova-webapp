@@ -1,31 +1,21 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAuthUserProfile } from "@/lib/auth-user";
+import {
+  AuthUserProfile,
+  getAuthUserProfile,
+  setAuthUserProfile,
+} from "@/lib/auth-user";
 import { logout as performLogout } from "@/lib/logout";
+import { API_URL } from "@/lib/config";
+import { getAuthHeaders } from "@/lib/cookies";
+import { PROFILE_ROLES } from "@/lib/profile";
+import { EditProfileModal } from "@/components/dashboard/edit-profile-modal";
+import { getPlanBalance, type SubscriptionPlan } from "@/lib/payments";
 import GoogleIcon from "@/assets/icons/Social/google.svg";
 import AppleIcon from "@/assets/icons/Social/apple.svg";
-
-function EyeIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden
-    >
-      <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
 
 function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -34,41 +24,89 @@ function initialsFromName(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-const roleOptions = [
-  "Trader",
-  "Active Options Trader.",
-  "Swing Trader",
-  "Analyst",
-  "Business developer",
-  "Exchange rate analyst",
-  "Trade Specialist",
-  "Trade Specialist",
-  "Exchange rate analyst",
-] as const;
+function deriveUsername(profile: AuthUserProfile): string {
+  if (profile.username) return profile.username;
+  if (profile.name) return profile.name.replace(/\s+/g, "").toLowerCase();
+  if (profile.email) return profile.email.split("@")[0] || "user";
+  return "user";
+}
 
 export default function UserSettingsPage() {
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [profile, setProfile] = useState<AuthUserProfile>({
+    name: "User",
+    email: "user@email.com",
+  });
   const [tradeReversalEnabled, setTradeReversalEnabled] = useState(true);
-
-  const [name, setName] = useState("User");
-  const [username, setUsername] = useState("user");
-  const [email, setEmail] = useState("user@email.com");
+  const [toggleError, setToggleError] = useState<string | null>(null);
+  const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan>("free");
+  const isMounted = useRef(true);
 
   useEffect(() => {
-    const user = getAuthUserProfile();
-    if (!user) return;
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
-    if (user.name) {
-      setName(user.name);
-      setUsername(user.name.replace(/\s+/g, "").toLowerCase());
+  useEffect(() => {
+    const cached = getAuthUserProfile();
+    if (cached) {
+      setProfile((prev) => ({ ...prev, ...cached }));
+      if (typeof cached.tradeReversalEnabled === "boolean") {
+        setTradeReversalEnabled(cached.tradeReversalEnabled);
+      }
     }
 
-    if (user.email) {
-      setEmail(user.email);
-      if (!user.name) setUsername(user.email.split("@")[0] || "user");
-    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/auth/check`, {
+          headers: getAuthHeaders(),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled || !data?.user) return;
+
+        const merged: AuthUserProfile = {
+          email: data.user.email,
+          name: data.user.name,
+          username: data.user.username,
+          role: data.user.role,
+          avatarDataUrl: data.user.avatarDataUrl,
+          tradeReversalEnabled: data.user.tradeReversalEnabled,
+        };
+
+        setProfile((prev) => ({ ...prev, ...merged }));
+        if (typeof merged.tradeReversalEnabled === "boolean") {
+          setTradeReversalEnabled(merged.tradeReversalEnabled);
+        }
+        setAuthUserProfile(merged);
+      } catch (err) {
+        console.error("Failed to load profile", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const balance = await getPlanBalance({ signal: controller.signal });
+        if (!controller.signal.aborted) setCurrentPlan(balance.plan);
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          console.error("Failed to load plan balance", err);
+        }
+      }
+    })();
+    return () => controller.abort();
   }, []);
 
   async function handleLogout() {
@@ -81,7 +119,47 @@ export default function UserSettingsPage() {
     }
   }
 
-  const avatarInitials = useMemo(() => initialsFromName(name), [name]);
+  async function handleToggleTradeReversal() {
+    const next = !tradeReversalEnabled;
+    setTradeReversalEnabled(next);
+    setToggleError(null);
+
+    try {
+      const res = await fetch(`${API_URL}/auth/profile`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ tradeReversalEnabled: next }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to update preference");
+      }
+
+      const data = await res.json();
+      if (data?.user) {
+        setProfile((prev) => ({ ...prev, ...data.user }));
+        setAuthUserProfile(data.user);
+      }
+    } catch (err) {
+      console.error(err);
+      if (isMounted.current) {
+        setTradeReversalEnabled(!next);
+        setToggleError("Couldn't save that change. Please try again.");
+      }
+    }
+  }
+
+  const displayName = profile.name || "User";
+  const displayEmail = profile.email || "";
+  const displayUsername = deriveUsername(profile);
+  const displayRole = profile.role || "Trader";
+  const avatarInitials = useMemo(
+    () => initialsFromName(displayName),
+    [displayName]
+  );
 
   return (
     <main className="flex-1 overflow-y-auto overflow-x-hidden bg-black">
@@ -91,6 +169,18 @@ export default function UserSettingsPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={() => router.push("/dashboard/settings/pricing")}
+              className={
+                currentPlan === "free"
+                  ? "rounded-md bg-emerald-400 px-3 py-1.5 text-sm font-medium text-black transition-colors hover:bg-emerald-300"
+                  : "rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 transition-colors hover:bg-zinc-800"
+              }
+            >
+              {currentPlan === "free" ? "Upgrade your plan" : "Manage plan"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsEditOpen(true)}
               className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 transition-colors hover:bg-zinc-800"
             >
               Edit profile
@@ -109,12 +199,21 @@ export default function UserSettingsPage() {
         <section className="rounded-xl border border-zinc-800 bg-[#090909] p-4 sm:p-5">
           <h2 className="mb-3 text-base font-medium text-white">Profile settings</h2>
           <div className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-black/40 p-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-sm font-medium text-white">
-              {avatarInitials}
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-zinc-700 text-sm font-medium text-white">
+              {profile.avatarDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={profile.avatarDataUrl}
+                  alt={displayName}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                avatarInitials
+              )}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-zinc-100">{name}</p>
-              <p className="truncate text-xs text-zinc-500">Trader.</p>
+              <p className="truncate text-sm font-medium text-zinc-100">{displayName}</p>
+              <p className="truncate text-xs text-zinc-500">{displayRole}</p>
             </div>
           </div>
         </section>
@@ -125,7 +224,7 @@ export default function UserSettingsPage() {
             <div>
               <label className="mb-1.5 block text-xs text-zinc-500">Username</label>
               <input
-                value={username}
+                value={displayUsername}
                 readOnly
                 className="h-10 w-full rounded-md border border-zinc-800 bg-black/50 px-3 text-sm text-zinc-200 outline-none"
               />
@@ -133,46 +232,27 @@ export default function UserSettingsPage() {
             <div>
               <label className="mb-1.5 block text-xs text-zinc-500">Role or Title</label>
               <div className="flex flex-wrap gap-2 rounded-md border border-zinc-800 bg-black/50 p-2.5">
-                {roleOptions.map((role, index) => (
-                  <button
-                    key={`${role}-${index}`}
-                    type="button"
+                {PROFILE_ROLES.map((option) => (
+                  <span
+                    key={option}
                     className={
-                      role === "Trader"
+                      option === displayRole
                         ? "rounded-md border border-zinc-600 bg-zinc-800 px-2.5 py-1 text-xs text-zinc-100"
                         : "rounded-md border border-zinc-800 bg-zinc-900/60 px-2.5 py-1 text-xs text-zinc-500"
                     }
                   >
-                    {role}
-                  </button>
+                    {option}
+                  </span>
                 ))}
               </div>
             </div>
-            <div>
+            <div className="lg:col-span-2">
               <label className="mb-1.5 block text-xs text-zinc-500">Email address</label>
               <input
-                value={email}
+                value={displayEmail}
                 readOnly
                 className="h-10 w-full rounded-md border border-zinc-800 bg-black/50 px-3 text-sm text-zinc-200 outline-none"
               />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs text-zinc-500">Password</label>
-              <div className="relative">
-                <input
-                  value={showPassword ? "212123233433" : "************"}
-                  readOnly
-                  className="h-10 w-full rounded-md border border-zinc-800 bg-black/50 px-3 pr-10 text-sm text-zinc-200 outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-500 hover:text-zinc-300"
-                  aria-label="Toggle password visibility"
-                >
-                  <EyeIcon className="h-4 w-4" />
-                </button>
-              </div>
             </div>
           </div>
 
@@ -182,7 +262,7 @@ export default function UserSettingsPage() {
             </p>
             <button
               type="button"
-              onClick={() => setTradeReversalEnabled((v) => !v)}
+              onClick={handleToggleTradeReversal}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                 tradeReversalEnabled ? "bg-zinc-200" : "bg-zinc-700"
               }`}
@@ -196,6 +276,9 @@ export default function UserSettingsPage() {
               />
             </button>
           </div>
+          {toggleError && (
+            <p className="mt-2 text-xs text-red-400">{toggleError}</p>
+          )}
         </section>
 
         <section className="mt-4 rounded-xl border border-zinc-800 bg-[#090909] p-4 sm:p-5">
@@ -218,6 +301,18 @@ export default function UserSettingsPage() {
           </div>
         </section>
       </div>
+
+      <EditProfileModal
+        open={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        initial={profile}
+        onSaved={(updated) => {
+          setProfile((prev) => ({ ...prev, ...updated }));
+          if (typeof updated.tradeReversalEnabled === "boolean") {
+            setTradeReversalEnabled(updated.tradeReversalEnabled);
+          }
+        }}
+      />
     </main>
   );
 }

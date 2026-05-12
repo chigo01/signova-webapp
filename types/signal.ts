@@ -42,6 +42,20 @@ export interface IExitTargets {
   takeProfit2: number;
 }
 
+export interface EliteEligibilityStage {
+  visibleLensPasses: number;
+  visibleLensTotal: number;
+  internalCheckPassRate: number;
+  eligible: boolean;
+  reasons: string[];
+  failedGates: string[];
+}
+
+export interface EliteEligibility {
+  before: EliteEligibilityStage;
+  after: EliteEligibilityStage;
+}
+
 export interface Signal {
   _id: string; // Mongoose adds this
   pair: string;
@@ -66,6 +80,10 @@ export interface Signal {
     rejectionReason?: string;
   };
   tradeOutcome?: "TP_HIT" | "SL_HIT" | "PENDING" | "BREAKEVEN" | "CANCELLED";
+  engine?: {
+    monitorKey?: string;
+    eliteEligibility?: EliteEligibility;
+  };
 }
 
 /** Row from GET /signals/history (approved signals history records). */
