@@ -25,7 +25,7 @@ export function WinRateGauge({ value = 80 }: { value?: number }) {
     return `M${s.x},${s.y} A${r},${r} 0 ${largeArc} 1 ${e.x},${e.y}`;
   };
 
-  const [winRate, setWinRate] = useState<number>(value);
+  const [winRate, setWinRate] = useState<number | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -37,7 +37,9 @@ export function WinRateGauge({ value = 80 }: { value?: number }) {
           setWinRate(currentWinRate);
         }
       } catch {
-        // Keep fallback value when request fails.
+        if (isMounted) {
+          setWinRate(value);
+        }
       }
     };
 
@@ -46,9 +48,10 @@ export function WinRateGauge({ value = 80 }: { value?: number }) {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [value]);
 
-  const v = Math.min(100, Math.max(0, winRate));
+  const isLoading = winRate === null;
+  const v = isLoading ? 0 : Math.min(100, Math.max(0, winRate));
   const displayWinRate = Number.isInteger(v) ? `${v}` : v.toFixed(2);
   const va = 180 - (v / 100) * 180;
 
@@ -69,7 +72,7 @@ export function WinRateGauge({ value = 80 }: { value?: number }) {
             strokeWidth={sw}
             strokeLinecap="round"
           />
-          {v > 0 && (
+          {!isLoading && v > 0 && (
             <path
               d={arc(180, va)}
               fill="none"
@@ -96,9 +99,18 @@ export function WinRateGauge({ value = 80 }: { value?: number }) {
         </svg>
 
         <div className="absolute inset-x-0 bottom-12 z-10 px-2 text-center">
-          <p className="text-4xl font-bold leading-none tracking-tight text-white">
-            {displayWinRate}%
-          </p>
+          {isLoading ? (
+            <div className="flex justify-center" aria-label="Loading win rate">
+              <span
+                className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-[#2DD4BF]"
+                role="status"
+              />
+            </div>
+          ) : (
+            <p className="text-4xl font-bold leading-none tracking-tight text-white">
+              {displayWinRate}%
+            </p>
+          )}
           <p className="mt-1 text-xs font-medium leading-snug text-zinc-500">
             Signova&apos;s Win Rate
           </p>

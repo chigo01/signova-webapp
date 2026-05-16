@@ -25,7 +25,7 @@ export default function DashboardPage() {
         </header>
 
         <h1 className="mb-5 text-3xl font-semibold tracking-tight bg-linear-to-r from-white via-[#A3A3A3] to-white bg-clip-text text-transparent sm:mb-6 sm:text-4xl md:mb-8">
-          Welcome to SIG<span className="text-[#565656]">NOVA</span>
+          Welcome to SIG<span className="text-[#565656]">NOVA</span>(beta)
         </h1>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-4 xl:grid-cols-7 xl:gap-x-4">

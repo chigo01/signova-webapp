@@ -11,18 +11,12 @@ import { TopGainers } from "@/components/dashboard/stocks/top-gainers";
 import { RecommendationsGrid } from "@/components/dashboard/stocks/recommendations-grid";
 import {
   fetchStockRecommendations,
+  fetchTopNews,
+  type NewsArticle,
   type StockRecommendation,
   type StockRecommendationsResponse,
 } from "@/lib/stocks";
-
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h ago`;
-}
+import { relativeTime } from "@/lib/time";
 
 const emptyData: StockRecommendationsResponse = {
   watchlist: [],
@@ -49,6 +43,8 @@ export function StocksPageContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [news, setNews] = useState<NewsArticle[]>([]);
+  const [newsLoading, setNewsLoading] = useState(true);
 
   const filtered = useMemo(() => {
     return {
@@ -58,20 +54,35 @@ export function StocksPageContent() {
   }, [data.watchlist, data.topMovers, searchQuery]);
 
   const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const next = await fetchStockRecommendations();
-      setData(next);
-    } catch (e) {
-      console.error(e);
+    setLoading(true);
+    setNewsLoading(true);
+    setError(null);
+
+    const [recsResult, newsResult] = await Promise.allSettled([
+      fetchStockRecommendations(),
+      fetchTopNews(),
+    ]);
+
+    if (recsResult.status === "fulfilled") {
+      setData(recsResult.value);
+    } else {
+      console.error(recsResult.reason);
       setError(
-        e instanceof Error ? e.message : "Couldn’t load stock recommendations."
+        recsResult.reason instanceof Error
+          ? recsResult.reason.message
+          : "Couldn’t load stock recommendations."
       );
       setData(emptyData);
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
+
+    if (newsResult.status === "fulfilled") {
+      setNews(newsResult.value.articles);
+    } else {
+      console.error(newsResult.reason);
+      setNews([]);
+    }
+    setNewsLoading(false);
   }, []);
 
   useEffect(() => {
@@ -138,7 +149,7 @@ export function StocksPageContent() {
           <HeatMap watchlist={filtered.watchlist} loading={loading} />
         </div>
         <div className="lg:col-span-4">
-          <TopNewsList />
+          <TopNewsList articles={news} loading={newsLoading} />
         </div>
         <div className="lg:col-span-4">
           <TopGainers stocks={filtered.watchlist} />

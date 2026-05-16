@@ -27,6 +27,22 @@ export interface StockRecommendationsResponse {
   lastUpdated: string;
 }
 
+export interface NewsArticle {
+  id: number;
+  symbol: string;
+  headline: string;
+  summary: string;
+  source: string;
+  url: string;
+  image: string;
+  datetime: number;
+}
+
+export interface TopNewsResponse {
+  articles: NewsArticle[];
+  lastUpdated: string;
+}
+
 /** GET /stocks/recommendations — requires auth in browser (static export). */
 export async function fetchStockRecommendations(): Promise<StockRecommendationsResponse> {
   const token = getAuthToken();
@@ -40,6 +56,24 @@ export async function fetchStockRecommendations(): Promise<StockRecommendationsR
 
   if (!res.ok) {
     throw new Error(`Failed to fetch stock recommendations: ${res.statusText}`);
+  }
+
+  return res.json();
+}
+
+/** GET /stocks/news — top headlines across the watchlist. */
+export async function fetchTopNews(): Promise<TopNewsResponse> {
+  const token = getAuthToken();
+  const res = await fetch(`${API_URL}/stocks/news`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch top news: ${res.statusText}`);
   }
 
   return res.json();

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { memo, useEffect, useRef } from "react";
-import { Loader2 } from "lucide-react";
+import React, { memo, useEffect, useRef, useState } from "react";
+import { Loader2, Maximize2, Minimize2 } from "lucide-react";
 
 type TradingViewWidgetProps = {
   /** TradingView symbol like "NASDAQ:AAPL" */
@@ -19,6 +19,21 @@ function TradingViewWidget({
   const container = useRef<HTMLDivElement | null>(null);
   const isMounted = useRef(true);
   const overlayRef = useRef<HTMLDivElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isFullscreen]);
 
   useEffect(() => {
     if (!container.current) return;
@@ -118,7 +133,14 @@ function TradingViewWidget({
   }, [symbol, interval]);
 
   return (
-    <div className={`relative ${className ?? ""}`} style={{ height: "100%", width: "100%" }}>
+    <div
+      className={
+        isFullscreen
+          ? "fixed inset-0 z-50 bg-black"
+          : `relative ${className ?? ""}`
+      }
+      style={isFullscreen ? undefined : { height: "100%", width: "100%" }}
+    >
       <div
         className="tradingview-widget-container h-full w-full"
         ref={container}
@@ -139,6 +161,20 @@ function TradingViewWidget({
         <span className="trademark"> by TradingView</span>
       </div>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setIsFullscreen((v) => !v)}
+        aria-label={isFullscreen ? "Exit fullscreen" : "Expand chart"}
+        title={isFullscreen ? "Exit fullscreen (Esc)" : "Expand chart"}
+        className="absolute right-2 top-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950/80 text-zinc-300 backdrop-blur transition hover:bg-zinc-900 hover:text-white focus:outline-none focus:ring-1 focus:ring-zinc-600"
+      >
+        {isFullscreen ? (
+          <Minimize2 className="h-4 w-4" />
+        ) : (
+          <Maximize2 className="h-4 w-4" />
+        )}
+      </button>
 
       <div
         ref={overlayRef}

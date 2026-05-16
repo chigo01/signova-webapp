@@ -94,7 +94,8 @@ export interface ApprovedSignalsHistory {
   symbol: string;
   signalType: "buy" | "sell";
   entryPrice: number;
-  targetPrice: number;
+  tp1: number;
+  tp2: number;
   stopLoss: number;
   playedAt: string;
   tradeOutcome?: "TP_HIT" | "SL_HIT" | "PENDING" | "BREAKEVEN" | "CANCELLED";

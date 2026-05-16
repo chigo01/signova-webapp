@@ -87,23 +87,6 @@ export function StockOptions() {
         </Link>
       </div>
 
-      <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-            className={cn(
-              "inline-flex items-center justify-center whitespace-nowrap rounded-lg border border-[#2F2F2F] bg-[#1E1E1E] px-[10px] py-[7px] text-[11px] font-medium transition-colors",
-              activeTab === tab
-                ? "border-[#2F2F2F] bg-[#2F2F2F] text-white"
-                : "text-zinc-500 hover:text-zinc-300"
-            )}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
 
       {isLoading ? (
         <div className="flex min-h-[120px] flex-col items-center justify-center gap-3 rounded-lg border border-zinc-800/80 bg-[#161616] py-10">
@@ -121,7 +104,7 @@ export function StockOptions() {
           }}
           className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
         >
-          <div className="grid grid-flow-col grid-rows-2 auto-cols-[210px] gap-2.5">
+          <div className="grid grid-flow-col grid-rows-3 auto-cols-[210px] gap-2.5">
             {(stocks.length > 6 ? autoScrollItems : stocks).map((stock, i) => {
               const isPositive = stock.changePercent >= 0;
               const percentText = `${isPositive ? "+" : ""}${stock.changePercent.toFixed(2)}%`;

@@ -62,10 +62,10 @@ export default function HistoryPage() {
 
       {/* Main Content */}
       <main className="flex-1 p-6">
-        <div className="mx-auto max-w-5xl space-y-6">
+        <div className="mx-auto space-y-6">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              Your recent trading activity and signal plays
+              Your recent trading activity and signal playsimage.png
             </p>
           </div>
 

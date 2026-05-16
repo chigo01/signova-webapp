@@ -68,7 +68,7 @@ function VaultSignalCard({
         </span>
       </div>
 
-      {/* TP1 & SL */}
+      {/* TP1 & SL side by side, TP2 below */}
       <div className="grid grid-cols-2 gap-2">
         <div className="flex flex-col items-center justify-center gap-[10px] rounded-[4px] border border-[#10C29C]/30 bg-[#10C29C]/10 p-[8px] text-center">
           <div className="flex items-center gap-1.5">
@@ -94,6 +94,20 @@ function VaultSignalCard({
             title={String(signal.exitTargets.stopLoss)}
           >
             {formatLevelValue(signal.exitTargets.stopLoss)}
+          </span>
+        </div>
+        <div className="col-span-2 flex flex-col items-center justify-center gap-[10px] rounded-[4px] border border-[#10C29C]/30 bg-[#10C29C]/10 p-[8px] text-center">
+          <div className="flex items-center gap-1.5">
+            <Target className="h-3 w-3 text-emerald-400" />
+            <span className="text-[10px] font-semibold text-emerald-400">
+              TP2
+            </span>
+          </div>
+          <span
+            className="block w-full truncate text-center text-xs font-mono text-white"
+            title={String(signal.exitTargets.takeProfit2)}
+          >
+            {formatLevelValue(signal.exitTargets.takeProfit2)}
           </span>
         </div>
       </div>

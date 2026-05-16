@@ -62,10 +62,11 @@ export function HistoryTable({ data, isLoading }: HistoryTableProps) {
               <th className="px-4 py-3 font-medium">Symbol</th>
               <th className="px-4 py-3 font-medium">Type</th>
               <th className="px-4 py-3 font-medium">Entry Price</th>
-              <th className="px-4 py-3 font-medium">Target</th>
+              <th className="px-4 py-3 font-medium">TP1</th>
+              <th className="px-4 py-3 font-medium">TP2</th>
               <th className="px-4 py-3 font-medium">Stop Loss</th>
-              <th className="px-4 py-3 font-medium">Played Out</th>
-              <th className="px-4 py-3 font-medium">Played At</th>
+              <th className="px-4 py-3 font-medium whitespace-nowrap">Played Out</th>
+              <th className="px-4 py-3 font-medium whitespace-nowrap">Played At</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -95,7 +96,10 @@ export function HistoryTable({ data, isLoading }: HistoryTableProps) {
                     {play.entryPrice}
                   </td>
                   <td className="px-4 py-3 font-mono text-green-600/80">
-                    {play.targetPrice}
+                    {play.tp1}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-green-600/80">
+                    {play.tp2}
                   </td>
                   <td className="px-4 py-3 font-mono text-red-600/80">
                     {play.stopLoss}
@@ -105,7 +109,7 @@ export function HistoryTable({ data, isLoading }: HistoryTableProps) {
                       {outcome.label}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">
+                  <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                     {new Date(play.playedAt).toLocaleString(undefined, {
                       dateStyle: "medium",
                       timeStyle: "short",
