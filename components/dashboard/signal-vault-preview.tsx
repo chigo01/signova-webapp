@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ClipboardList } from "lucide-react";
-import TradingViewWidget from "@/components/signals/tradingview-widget";
+import TradingViewChart from "@/components/charts/trading-view-chart";
 
 export function SignalVaultPreview() {
   return (
@@ -27,7 +27,7 @@ export function SignalVaultPreview() {
       </div>
 
       <div className="min-h-[240px] w-full min-w-0 flex-1 lg:min-h-[280px]">
-        <TradingViewWidget symbol="OANDA:GBPUSD" interval="D" />
+        <TradingViewChart symbol="GBPUSD" interval="1D" />
       </div>
     </div>
   );

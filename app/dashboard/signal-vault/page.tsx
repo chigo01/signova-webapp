@@ -15,8 +15,8 @@ import { Signal } from "@/types/signal";
 import { fetchApprovedSignals, playSignal } from "@/lib/signals";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { pairToTradingViewSymbol } from "@/lib/tradingview-symbol";
-import TradingViewWidget from "@/components/signals/tradingview-widget";
+import { pairToForexSymbol } from "@/lib/pair-to-forex-symbol";
+import TradingViewChart from "@/components/charts/trading-view-chart";
 
 function formatLevelValue(value: number): string {
   // Keep signal levels compact so they never overflow the TP/SL boxes.
@@ -144,7 +144,8 @@ export default function SignalVaultPage() {
   const [isLoadingSignals, setIsLoadingSignals] = useState(true);
   /** Set when fetch throws so we show the same refresh affordances as empty state */
   const [signalsLoadError, setSignalsLoadError] = useState<string | null>(null);
-  const [chartSymbol, setChartSymbol] = useState("OANDA:EURUSD");
+  const [chartSymbol, setChartSymbol] = useState("EURUSD");
+  const [playingSignal, setPlayingSignal] = useState<Signal | null>(null);
 
   const loadSignals = useCallback(async () => {
     try {
@@ -170,7 +171,8 @@ export default function SignalVaultPage() {
   }, [loadSignals]);
 
   const handleSignalPlay = (signal: Signal) => {
-    setChartSymbol(pairToTradingViewSymbol(signal.pair));
+    setChartSymbol(pairToForexSymbol(signal.pair) ?? "EURUSD");
+    setPlayingSignal(signal);
   };
 
   const signalsPanel = (
@@ -298,7 +300,11 @@ export default function SignalVaultPage() {
         <section className="flex min-h-0 flex-col lg:h-full lg:min-h-0 lg:flex-1">
           <div className="relative flex min-h-0 flex-1 flex-col px-2 pb-2 pt-1 lg:h-full lg:min-h-0">
             <div className="h-[min(42vh,380px)] max-h-[420px] min-h-[280px] w-full flex-1 sm:h-[min(50vh,480px)] sm:max-h-[520px] lg:h-full lg:max-h-[760px] lg:min-h-[400px]">
-              <TradingViewWidget symbol={chartSymbol} interval="D" />
+              <TradingViewChart
+                symbol={chartSymbol}
+                interval="1D"
+                signal={playingSignal ?? undefined}
+              />
             </div>
           </div>
 
