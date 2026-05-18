@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { getAuthUserProfile } from "@/lib/auth-user";
 import { logout as performLogout } from "@/lib/logout";
+import { getPlanBalance, type SubscriptionPlan } from "@/lib/payments";
 
 import Logo from "@/assets/icons/logos/Main-icon.svg";
 import LayoutDashboard from "@/assets/icons/dashboard-active.svg";
@@ -59,6 +60,28 @@ function LogOutIcon({ className }: { className?: string }) {
   );
 }
 
+function PlanBadge({ plan }: { plan: SubscriptionPlan }) {
+  if (plan === "pro") {
+    return (
+      <span className="ml-2 shrink-0 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
+        Pro
+      </span>
+    );
+  }
+  if (plan === "business") {
+    return (
+      <span className="ml-2 shrink-0 rounded-md border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300">
+        Business
+      </span>
+    );
+  }
+  return (
+    <span className="ml-2 shrink-0 rounded-md border border-zinc-700 bg-zinc-800/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+      Free
+    </span>
+  );
+}
+
 function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
@@ -73,6 +96,7 @@ export function Sidebar() {
   const [userEmail, setUserEmail] = useState("Signed in");
   const [hasStoredProfile, setHasStoredProfile] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [plan, setPlan] = useState<SubscriptionPlan | null>(null);
 
   useEffect(() => {
     const user = getAuthUserProfile();
@@ -84,6 +108,21 @@ export function Sidebar() {
       setUserName(user.email.split("@")[0] || "User");
     }
     if (user?.email) setUserEmail(user.email);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const balance = await getPlanBalance({ signal: controller.signal });
+        if (!controller.signal.aborted) setPlan(balance.plan);
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          console.error("Failed to load plan in sidebar", err);
+        }
+      }
+    })();
+    return () => controller.abort();
   }, []);
 
   async function handleLogout() {
@@ -159,6 +198,7 @@ export function Sidebar() {
             </span>
             <span className="truncate text-xs text-zinc-500">{userEmail}</span>
           </div>
+          {plan && <PlanBadge plan={plan} />}
         </Link>
         <button
           type="button"

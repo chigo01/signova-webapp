@@ -41,25 +41,6 @@ function formatExpiryDate(value: string | null | undefined): string {
   });
 }
 
-function CopyIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-    </svg>
-  );
-}
-
 function CheckIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -105,6 +86,26 @@ function SpinnerIcon({ className }: { className?: string }) {
   );
 }
 
+function ExternalLinkIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M15 3h6v6" />
+      <path d="M10 14 21 3" />
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    </svg>
+  );
+}
+
 export function PaymentModal({
   payment,
   planId,
@@ -127,7 +128,6 @@ export function PaymentModal({
     const expiry = new Date(payment.expiresAt).getTime();
     return Math.max(0, expiry - Date.now());
   });
-  const [copied, setCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const successCallbackRef = useRef(onSuccess);
@@ -159,9 +159,7 @@ export function PaymentModal({
     }
 
     const transactionId = payment.transactionId;
-    if (!transactionId) {
-      return;
-    }
+    if (!transactionId) return;
 
     const controller = new AbortController();
     let cancelled = false;
@@ -197,19 +195,10 @@ export function PaymentModal({
     };
   }, [payment.transactionId, status]);
 
-  const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(payment.accountNumber);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      setErrorMessage("Could not copy account number");
-    }
-  }, [payment.accountNumber]);
-
-  const handleMarkPaid = useCallback(() => {
-    setStatus("confirming");
-  }, []);
+  const handlePayWithPaystack = useCallback(() => {
+    window.open(payment.authorizationUrl, "_blank", "noopener,noreferrer");
+    setStatus((current) => (current === "waiting" ? "confirming" : current));
+  }, [payment.authorizationUrl]);
 
   const successExpiry = useMemo(
     () => formatExpiryDate(latest?.user.proPlanExpiry),
@@ -299,7 +288,7 @@ export function PaymentModal({
           <div className="flex flex-col items-center gap-3 px-5 py-7 text-center">
             <p className="text-sm text-zinc-400">
               {status === "expired"
-                ? "This payment session has expired. Generate a new account to retry."
+                ? "This payment session has expired. Start a new payment to retry."
                 : "Your payment could not be confirmed. Please try again."}
             </p>
             <div className="mt-1 flex w-full flex-col gap-2">
@@ -308,7 +297,7 @@ export function PaymentModal({
                 onClick={onRetry}
                 className="w-full rounded-md bg-white px-4 py-2.5 text-sm font-medium text-black transition-colors hover:bg-zinc-200"
               >
-                Generate new account
+                Try again
               </button>
               <button
                 type="button"
@@ -322,9 +311,9 @@ export function PaymentModal({
         ) : (
           <div className="space-y-4 px-5 py-5">
             <p className="text-sm text-zinc-400">
-              Transfer the exact amount below to the bank account we just
-              generated. Your plan upgrades automatically as soon as we confirm
-              the payment.
+              You&apos;ll be taken to Paystack to complete payment securely with
+              card, bank transfer, USSD or QR. Your plan upgrades automatically
+              as soon as we confirm the payment.
             </p>
 
             <div className="grid gap-3 rounded-lg border border-zinc-800 bg-black/40 p-4">
@@ -338,39 +327,12 @@ export function PaymentModal({
               </div>
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-xs uppercase tracking-wider text-zinc-500">
-                  Bank
+                  Plan
                 </span>
                 <span className="text-right text-sm font-medium text-zinc-100">
-                  {payment.bankName}
+                  {planMeta.badge} · {monthsCount} month
+                  {monthsCount > 1 ? "s" : ""}
                 </span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs uppercase tracking-wider text-zinc-500">
-                  Account number
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-sm font-medium tracking-wider text-white">
-                    {payment.accountNumber}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleCopy}
-                    className="flex items-center gap-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 transition-colors hover:bg-zinc-800"
-                    aria-label="Copy account number"
-                  >
-                    {copied ? (
-                      <>
-                        <CheckIcon className="h-3.5 w-3.5" />
-                        Copied
-                      </>
-                    ) : (
-                      <>
-                        <CopyIcon className="h-3.5 w-3.5" />
-                        Copy
-                      </>
-                    )}
-                  </button>
-                </div>
               </div>
             </div>
 
@@ -386,8 +348,8 @@ export function PaymentModal({
                 )}
                 <p className="text-sm text-zinc-200">
                   {status === "confirming"
-                    ? "Confirming your payment..."
-                    : "Waiting for payment..."}
+                    ? "Waiting for Paystack to confirm..."
+                    : "Ready to pay"}
                 </p>
               </div>
               <span className="font-mono text-xs text-zinc-400">
@@ -395,24 +357,17 @@ export function PaymentModal({
               </span>
             </div>
 
-            {!payment.transactionId && (
-              <p className="text-xs text-amber-400">
-                We won&apos;t be able to auto-confirm this payment from the
-                browser until the server has been redeployed. Your plan will
-                still upgrade automatically once Aella notifies the server.
-              </p>
-            )}
             {errorMessage && (
               <p className="text-xs text-red-400">{errorMessage}</p>
             )}
 
             <button
               type="button"
-              onClick={handleMarkPaid}
-              disabled={status === "confirming"}
-              className="w-full rounded-md bg-white px-4 py-2.5 text-sm font-medium text-black transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={handlePayWithPaystack}
+              className="flex w-full items-center justify-center gap-2 rounded-md bg-white px-4 py-2.5 text-sm font-medium text-black transition-colors hover:bg-zinc-200"
             >
-              I&apos;ve sent the payment
+              Pay with Paystack
+              <ExternalLinkIcon className="h-4 w-4" />
             </button>
           </div>
         )}
@@ -420,7 +375,7 @@ export function PaymentModal({
         {!isTerminal && (
           <footer className="border-t border-zinc-800 px-5 py-3 text-center">
             <p className="text-[11px] text-zinc-500">
-              Account expires automatically in {formatCountdown(remainingMs)}.
+              Session expires in {formatCountdown(remainingMs)}.
             </p>
           </footer>
         )}

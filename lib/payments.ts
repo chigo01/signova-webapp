@@ -61,13 +61,12 @@ export const PLAN_META: Record<PlanId | "free", PlanMeta> = {
 
 export interface UpgradePaymentResponse {
   message: string;
-  // Newer fields may be missing if the server hasn't been redeployed yet.
-  transactionId?: string;
-  planId?: PlanId;
-  monthsCount?: number;
-  displayUsd?: number;
-  accountNumber: string;
-  bankName: string;
+  transactionId: string;
+  planId: PlanId;
+  monthsCount: number;
+  displayUsd: number;
+  authorizationUrl: string;
+  reference: string;
   amount: number;
   expiresAt: string;
 }
@@ -79,8 +78,8 @@ export interface TransactionStatusResponse {
   monthsCount: number;
   amount: number;
   displayUsd?: number;
-  accountNumber: string;
-  bankName: string;
+  authorizationUrl: string;
+  reference: string;
   expiresAt: string;
   createdAt: string;
   user: {
