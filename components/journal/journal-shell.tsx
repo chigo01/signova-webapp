@@ -244,7 +244,7 @@ export function JournalShell({ journalId }: { journalId?: string } = {}) {
     try {
       const created = await createJournal();
       setOpenPopover(null);
-      router.push(`/dashboard/journal/${created._id}`);
+      router.push(`/dashboard/journal?id=${created._id}`);
     } catch (createError) {
       setError(
         createError instanceof Error

@@ -8,7 +8,7 @@ import type { JournalSummary } from "@/components/journal/journal-types";
 function journalHref(summary: JournalSummary): string {
   return summary.isDefault
     ? "/dashboard/journal"
-    : `/dashboard/journal/${summary._id}`;
+    : `/dashboard/journal?id=${summary._id}`;
 }
 
 function journalLabel(summary: JournalSummary): string {
