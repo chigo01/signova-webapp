@@ -120,9 +120,6 @@ export function StocksPageContent() {
               className="w-64 border-0 bg-zinc-900 pl-10 text-white placeholder:text-zinc-500"
             />
           </div>
-          <Button className="bg-white text-black hover:bg-zinc-200">
-            View my stocks
-          </Button>
         </div>
       </div>
 
