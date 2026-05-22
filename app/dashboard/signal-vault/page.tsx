@@ -277,16 +277,6 @@ export default function SignalVaultPage() {
             className="h-9 w-56 rounded-full bg-zinc-900 pl-10 pr-4 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-700"
           />
         </div>
-
-        <Link href="/dashboard/videos">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="rounded-full bg-white px-4 text-xs text-black hover:bg-zinc-200"
-          >
-            Watch tutorials
-          </Button>
-        </Link>
       </header>
 
       {/* Mobile: title (layout already has logo bar) */}
@@ -308,19 +298,6 @@ export default function SignalVaultPage() {
             </div>
           </div>
 
-          {/* Mobile: Watch tutorials under chart */}
-          <div className="flex justify-center px-4 py-3 lg:hidden">
-            <Link href="/dashboard/videos">
-              <Button
-                variant="secondary"
-                size="sm"
-                className="rounded-full bg-white px-5 py-2.5 text-xs font-semibold text-black hover:bg-zinc-200"
-              >
-                <Play className="mr-2 h-3.5 w-3.5 fill-current" />
-                Watch tutorials
-              </Button>
-            </Link>
-          </div>
         </section>
 
         {/* Active signals — full width card on mobile, sidebar on desktop */}
