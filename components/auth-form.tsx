@@ -20,6 +20,7 @@ export function AuthForm({ type }: AuthFormProps) {
   const [step, setStep] = React.useState<"email" | "otp">("email");
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
   const [email, setEmail] = React.useState("");
+  const [phone, setPhone] = React.useState("");
   const [otp, setOtp] = React.useState("");
 
   const API_URL =
@@ -74,6 +75,8 @@ export function AuthForm({ type }: AuthFormProps) {
             type === "register"
               ? (document.getElementById("name") as HTMLInputElement)?.value
               : undefined,
+          phone:
+            type === "register" && phone.trim() ? phone.trim() : undefined,
         }),
       });
 
@@ -179,6 +182,25 @@ export function AuthForm({ type }: AuthFormProps) {
                     disabled={isLoading}
                     required
                   />
+                </div>
+              )}
+              {type === "register" && (
+                <div className="grid gap-2">
+                  <Label htmlFor="phone">Phone number</Label>
+                  <Input
+                    id="phone"
+                    placeholder="+14155550100"
+                    type="tel"
+                    autoComplete="tel"
+                    pattern="\+[1-9]\d{1,14}"
+                    title="Use international E.164 format, e.g. +14155550100"
+                    disabled={isLoading}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                  <p className="text-xs text-zinc-500">
+                    Optional. International format, e.g. +14155550100
+                  </p>
                 </div>
               )}
               <div className="grid gap-2">

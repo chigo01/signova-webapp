@@ -3,6 +3,7 @@ const STORAGE_KEY = "signova_auth_user";
 export interface AuthUserProfile {
   email?: string;
   name?: string;
+  phone?: string;
   username?: string;
   role?: string;
   avatarDataUrl?: string;
@@ -17,6 +18,7 @@ export function setAuthUserProfile(user: AuthUserProfile | null | undefined): vo
       JSON.stringify({
         email: user.email,
         name: user.name,
+        phone: user.phone,
         username: user.username,
         role: user.role,
         avatarDataUrl: user.avatarDataUrl,
@@ -38,6 +40,7 @@ export function getAuthUserProfile(): AuthUserProfile | null {
     const {
       email,
       name,
+      phone,
       username,
       role,
       avatarDataUrl,
@@ -46,6 +49,7 @@ export function getAuthUserProfile(): AuthUserProfile | null {
     return {
       ...(typeof email === "string" ? { email } : {}),
       ...(typeof name === "string" ? { name } : {}),
+      ...(typeof phone === "string" ? { phone } : {}),
       ...(typeof username === "string" ? { username } : {}),
       ...(typeof role === "string" ? { role } : {}),
       ...(typeof avatarDataUrl === "string" ? { avatarDataUrl } : {}),

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -14,8 +13,9 @@ import { getAuthHeaders } from "@/lib/cookies";
 import { PROFILE_ROLES } from "@/lib/profile";
 import { EditProfileModal } from "@/components/dashboard/edit-profile-modal";
 import { getPlanBalance, type SubscriptionPlan } from "@/lib/payments";
-import GoogleIcon from "@/assets/icons/Social/google.svg";
-import AppleIcon from "@/assets/icons/Social/apple.svg";
+
+// Mirrors the backend default for tradeReversalEnabled (user.model.ts).
+const TRADE_REVERSAL_DEFAULT = true;
 
 function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -27,18 +27,15 @@ function initialsFromName(name: string): string {
 function deriveUsername(profile: AuthUserProfile): string {
   if (profile.username) return profile.username;
   if (profile.name) return profile.name.replace(/\s+/g, "").toLowerCase();
-  if (profile.email) return profile.email.split("@")[0] || "user";
-  return "user";
+  if (profile.email) return profile.email.split("@")[0] || "";
+  return "";
 }
 
 export default function UserSettingsPage() {
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [profile, setProfile] = useState<AuthUserProfile>({
-    name: "User",
-    email: "user@email.com",
-  });
+  const [profile, setProfile] = useState<AuthUserProfile>({});
   const [tradeReversalEnabled, setTradeReversalEnabled] = useState(true);
   const [toggleError, setToggleError] = useState<string | null>(null);
   const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan>("free");
@@ -152,10 +149,10 @@ export default function UserSettingsPage() {
     }
   }
 
-  const displayName = profile.name || "User";
+  const displayName = profile.name || "";
   const displayEmail = profile.email || "";
   const displayUsername = deriveUsername(profile);
-  const displayRole = profile.role || "Trader";
+  const displayRole = profile.role || "";
   const avatarInitials = useMemo(
     () => initialsFromName(displayName),
     [displayName]
@@ -212,8 +209,8 @@ export default function UserSettingsPage() {
               )}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-zinc-100">{displayName}</p>
-              <p className="truncate text-xs text-zinc-500">{displayRole}</p>
+              <p className="truncate text-sm font-medium text-zinc-100">{displayName || "—"}</p>
+              <p className="truncate text-xs text-zinc-500">{displayRole || "—"}</p>
             </div>
           </div>
         </section>
@@ -258,7 +255,10 @@ export default function UserSettingsPage() {
 
           <div className="mt-4 flex items-center justify-between rounded-md border border-zinc-800 bg-black/50 px-3 py-2.5">
             <p className="text-sm text-zinc-200">
-              Trade reversal feature <span className="text-zinc-500">(Default)</span>
+              Trade reversal feature{" "}
+              {tradeReversalEnabled === TRADE_REVERSAL_DEFAULT && (
+                <span className="text-zinc-500">(Default)</span>
+              )}
             </p>
             <button
               type="button"
@@ -279,26 +279,6 @@ export default function UserSettingsPage() {
           {toggleError && (
             <p className="mt-2 text-xs text-red-400">{toggleError}</p>
           )}
-        </section>
-
-        <section className="mt-4 rounded-xl border border-zinc-800 bg-[#090909] p-4 sm:p-5">
-          <h2 className="mb-3 text-base font-medium text-white">Integrators</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-md">
-            <button
-              type="button"
-              className="flex h-11 items-center justify-center gap-2 rounded-md border border-zinc-800 bg-zinc-900/60 text-sm text-zinc-100 transition-colors hover:bg-zinc-800"
-            >
-              <Image src={GoogleIcon} alt="" width={18} height={18} />
-              Google
-            </button>
-            <button
-              type="button"
-              className="flex h-11 items-center justify-center gap-2 rounded-md border border-zinc-800 bg-zinc-900/60 text-sm text-zinc-100 transition-colors hover:bg-zinc-800"
-            >
-              <Image src={AppleIcon} alt="" width={18} height={18} />
-              Apple
-            </button>
-          </div>
         </section>
       </div>
 
