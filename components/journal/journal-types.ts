@@ -3,7 +3,8 @@ export type JournalPropertyType =
   | "date"
   | "select"
   | "multi-select"
-  | "number";
+  | "number"
+  | "ai";
 
 export type JournalViewType =
   | "table"
@@ -12,10 +13,20 @@ export type JournalViewType =
   | "gallery"
   | "list";
 
+export type JournalAiKind = "summary" | "key-info" | "custom" | "translation";
+
 export interface JournalPropertyOption {
   id: string;
   label: string;
   color: string;
+}
+
+export interface JournalAiConfig {
+  kind: JournalAiKind;
+  prompt?: string;
+  targetLanguage?: string;
+  sourcePropertyIds?: string[];
+  model?: string;
 }
 
 export interface JournalProperty {
@@ -25,6 +36,7 @@ export interface JournalProperty {
   options?: JournalPropertyOption[];
   width?: number;
   hidden?: boolean;
+  ai?: JournalAiConfig;
 }
 
 export interface JournalView {
