@@ -8,7 +8,7 @@ export interface Signal {
   sl: number;
   confidence: number;
   timeframe: string;
-  reasoning: string;
+  reasoning: string[];
   charts?: {
     [key: string]: string; // URL
   };

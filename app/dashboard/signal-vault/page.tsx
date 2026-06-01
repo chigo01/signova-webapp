@@ -114,9 +114,14 @@ function VaultSignalCard({
 
       {/* Reasoning */}
       {signal.reasoning && signal.reasoning.length > 0 && (
-        <p className="line-clamp-3 text-[11px] leading-relaxed text-zinc-500">
-          {signal.reasoning[0]}
-        </p>
+        <ul className="space-y-1 text-[11px] leading-relaxed text-zinc-500">
+          {signal.reasoning.map((point, index) => (
+            <li key={index} className="flex gap-1.5">
+              <span className="mt-1 h-0.5 w-0.5 shrink-0 rounded-full bg-zinc-600" />
+              <span>{point}</span>
+            </li>
+          ))}
+        </ul>
       )}
 
       {/* Play Button — white pill, dark icon (mobile mock) */}

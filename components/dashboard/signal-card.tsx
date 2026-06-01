@@ -99,9 +99,17 @@ export function SignalCard({ signal, onClick }: SignalCardProps) {
 
       {signal.reasoning && signal.reasoning.length > 0 && (
         <div className="mb-4 pt-3 border-t border-border/50">
-          <p className="text-xs text-muted-foreground line-clamp-2">
-            {signal.reasoning[0]}
-          </p>
+          <ul className="space-y-1.5">
+            {signal.reasoning.map((point, index) => (
+              <li
+                key={index}
+                className="flex gap-2 text-xs text-muted-foreground"
+              >
+                <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-muted-foreground/60" />
+                <span>{point}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
