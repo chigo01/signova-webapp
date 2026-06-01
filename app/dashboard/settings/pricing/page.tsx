@@ -201,6 +201,21 @@ export default function PricingPage() {
             </div>
           </div>
 
+          <div className="mt-8 flex flex-col items-center px-4 py-12 text-center">
+            <span className="inline-flex items-center rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-300">
+              Coming Soon
+            </span>
+            <h2 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">
+              Payment plans are coming soon
+            </h2>
+            <p className="mt-2 max-w-md text-sm text-zinc-400">
+              We&apos;re putting the finishing touches on our subscription
+              plans. Check back soon to upgrade.
+            </p>
+          </div>
+
+          {/* TODO: re-enable payment plans — original markup preserved below */}
+          {/*
           <div className="mt-8 flex flex-col items-center text-center">
             <span className="inline-flex items-center rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-300">
               Payment plan
@@ -307,9 +322,12 @@ export default function PricingPage() {
               {subscribeError}
             </p>
           )}
+          */}
         </section>
       </div>
 
+      {/* TODO: re-enable when payment plans return */}
+      {/*
       {activePaymentResponse && activePaymentPlanId && (
         <PaymentModal
           payment={activePaymentResponse}
@@ -319,6 +337,7 @@ export default function PricingPage() {
           onRetry={handleRetryPayment}
         />
       )}
+      */}
     </main>
   );
 }

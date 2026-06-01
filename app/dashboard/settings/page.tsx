@@ -164,6 +164,8 @@ export default function UserSettingsPage() {
         <header className="mb-5 flex items-center justify-between sm:mb-6">
           <h1 className="text-2xl font-semibold text-white sm:text-[32px]">Settings</h1>
           <div className="flex items-center gap-2">
+            {/* TODO: re-enable when payment plans return */}
+            {/*
             <button
               type="button"
               onClick={() => router.push("/dashboard/settings/pricing")}
@@ -175,6 +177,7 @@ export default function UserSettingsPage() {
             >
               {currentPlan === "free" ? "Upgrade your plan" : "Manage plan"}
             </button>
+            */}
             <button
               type="button"
               onClick={() => setIsEditOpen(true)}
