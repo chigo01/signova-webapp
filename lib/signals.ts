@@ -48,6 +48,28 @@ const fallbackSupportResistance: Signal["supportResistance"] = {
   currentLevel: "neutral",
 };
 
+/**
+ * Strip internal provider attribution from user-facing reasoning text.
+ * The contrarian-reversal signal was historically labelled with the engine
+ * that produced its source picks; those strings are still stored on older
+ * signals in the DB, so we rewrite them to neutral wording on the way out.
+ */
+function sanitizeReasoning(points: string[]): string[] {
+  return points.map((p) =>
+    p
+      // legacy: "Contrarian reverse of Claude worst-5 BUY setup" -> "Contrarian reversal setup (BUY)"
+      .replace(
+        /Contrarian reverse of Claude worst-5 (BUY|SELL) setup/gi,
+        "Contrarian reversal setup ($1)"
+      )
+      // legacy: "Reverse trade setup from Claude worst-5: ..." -> "Reverse trade setup: ..."
+      .replace(/Reverse trade setup from Claude worst-5:/gi, "Reverse trade setup:")
+      // catch-all: remove any remaining provider attribution
+      .replace(/\bClaude(?:'s)?\s+(?:worst|best)-5\b/gi, "model")
+      .replace(/\b(?:Claude|Anthropic)\b/gi, "the engine")
+  );
+}
+
 function parseMonitorKey(monitorKey?: string): Partial<Signal> {
   if (!monitorKey) return {};
 
@@ -129,8 +151,9 @@ function normalizeSignal(signal: ApiSignal): Signal | null {
       takeProfit: riskAssessment.takeProfit ?? exitTargets.takeProfit1,
       riskRewardRatio: riskAssessment.riskRewardRatio ?? 0,
     },
-    reasoning:
-      signal.reasoning ?? rawSignal.reasoning ?? legacySignal.reasoning ?? [],
+    reasoning: sanitizeReasoning(
+      signal.reasoning ?? rawSignal.reasoning ?? legacySignal.reasoning ?? []
+    ),
     timestamp:
       signal.timestamp ??
       rawSignal.timestamp ??
