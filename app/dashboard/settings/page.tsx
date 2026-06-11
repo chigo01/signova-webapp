@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AuthUserProfile,
+  NotificationPreferences,
   getAuthUserProfile,
   setAuthUserProfile,
 } from "@/lib/auth-user";
@@ -16,6 +17,30 @@ import { getPlanBalance, type SubscriptionPlan } from "@/lib/payments";
 
 // Mirrors the backend default for tradeReversalEnabled (user.model.ts).
 const TRADE_REVERSAL_DEFAULT = true;
+
+// Notification categories users can opt in/out of. Keys mirror the backend
+// notificationPreferences (user.model.ts); all default to ON.
+type NotificationKey = keyof NotificationPreferences;
+const NOTIFICATION_OPTIONS: { key: NotificationKey; label: string }[] = [
+  { key: "newSignals", label: "New signal alerts" },
+  { key: "tradeAlerts", label: "Trade updates (TP/SL hits)" },
+  { key: "newsletter", label: "Newsletter & product updates" },
+];
+const NOTIFICATION_DEFAULTS: Required<NotificationPreferences> = {
+  newSignals: true,
+  tradeAlerts: true,
+  newsletter: true,
+};
+
+function normalizeNotificationPrefs(
+  prefs: NotificationPreferences | undefined
+): Required<NotificationPreferences> {
+  return {
+    newSignals: prefs?.newSignals ?? NOTIFICATION_DEFAULTS.newSignals,
+    tradeAlerts: prefs?.tradeAlerts ?? NOTIFICATION_DEFAULTS.tradeAlerts,
+    newsletter: prefs?.newsletter ?? NOTIFICATION_DEFAULTS.newsletter,
+  };
+}
 
 function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -38,6 +63,12 @@ export default function UserSettingsPage() {
   const [profile, setProfile] = useState<AuthUserProfile>({});
   const [tradeReversalEnabled, setTradeReversalEnabled] = useState(true);
   const [toggleError, setToggleError] = useState<string | null>(null);
+  const [notificationPrefs, setNotificationPrefs] = useState<
+    Required<NotificationPreferences>
+  >(NOTIFICATION_DEFAULTS);
+  const [notificationError, setNotificationError] = useState<string | null>(
+    null
+  );
   const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan>("free");
   const isMounted = useRef(true);
 
@@ -54,6 +85,11 @@ export default function UserSettingsPage() {
       setProfile((prev) => ({ ...prev, ...cached }));
       if (typeof cached.tradeReversalEnabled === "boolean") {
         setTradeReversalEnabled(cached.tradeReversalEnabled);
+      }
+      if (cached.notificationPreferences) {
+        setNotificationPrefs(
+          normalizeNotificationPrefs(cached.notificationPreferences)
+        );
       }
     }
 
@@ -74,11 +110,17 @@ export default function UserSettingsPage() {
           role: data.user.role,
           avatarDataUrl: data.user.avatarDataUrl,
           tradeReversalEnabled: data.user.tradeReversalEnabled,
+          notificationPreferences: data.user.notificationPreferences,
         };
 
         setProfile((prev) => ({ ...prev, ...merged }));
         if (typeof merged.tradeReversalEnabled === "boolean") {
           setTradeReversalEnabled(merged.tradeReversalEnabled);
+        }
+        if (merged.notificationPreferences) {
+          setNotificationPrefs(
+            normalizeNotificationPrefs(merged.notificationPreferences)
+          );
         }
         setAuthUserProfile(merged);
       } catch (err) {
@@ -145,6 +187,44 @@ export default function UserSettingsPage() {
       if (isMounted.current) {
         setTradeReversalEnabled(!next);
         setToggleError("Couldn't save that change. Please try again.");
+      }
+    }
+  }
+
+  async function handleToggleNotification(key: NotificationKey) {
+    const next = !notificationPrefs[key];
+    setNotificationPrefs((prev) => ({ ...prev, [key]: next }));
+    setNotificationError(null);
+
+    try {
+      const res = await fetch(`${API_URL}/auth/profile`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ notificationPreferences: { [key]: next } }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to update preference");
+      }
+
+      const data = await res.json();
+      if (data?.user) {
+        setProfile((prev) => ({ ...prev, ...data.user }));
+        setAuthUserProfile(data.user);
+        if (data.user.notificationPreferences) {
+          setNotificationPrefs(
+            normalizeNotificationPrefs(data.user.notificationPreferences)
+          );
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      if (isMounted.current) {
+        setNotificationPrefs((prev) => ({ ...prev, [key]: !next }));
+        setNotificationError("Couldn't save that change. Please try again.");
       }
     }
   }
@@ -281,6 +361,47 @@ export default function UserSettingsPage() {
           </div>
           {toggleError && (
             <p className="mt-2 text-xs text-red-400">{toggleError}</p>
+          )}
+        </section>
+
+        <section className="mt-4 rounded-xl border border-zinc-800 bg-[#090909] p-4 sm:p-5">
+          <h2 className="mb-1 text-base font-medium text-white">
+            Notification settings
+          </h2>
+          <p className="mb-4 text-xs text-zinc-500">
+            Choose which emails you want to receive. Login codes and account
+            emails are always sent.
+          </p>
+          <div className="space-y-3">
+            {NOTIFICATION_OPTIONS.map(({ key, label }) => {
+              const enabled = notificationPrefs[key];
+              return (
+                <div
+                  key={key}
+                  className="flex items-center justify-between rounded-md border border-zinc-800 bg-black/50 px-3 py-2.5"
+                >
+                  <p className="text-sm text-zinc-200">{label}</p>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleNotification(key)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      enabled ? "bg-zinc-200" : "bg-zinc-700"
+                    }`}
+                    aria-pressed={enabled}
+                    aria-label={`Toggle ${label}`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-black transition-transform ${
+                        enabled ? "translate-x-5" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          {notificationError && (
+            <p className="mt-2 text-xs text-red-400">{notificationError}</p>
           )}
         </section>
       </div>

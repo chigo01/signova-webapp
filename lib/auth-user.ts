@@ -1,5 +1,11 @@
 const STORAGE_KEY = "signova_auth_user";
 
+export interface NotificationPreferences {
+  newSignals?: boolean;
+  tradeAlerts?: boolean;
+  newsletter?: boolean;
+}
+
 export interface AuthUserProfile {
   email?: string;
   name?: string;
@@ -8,6 +14,7 @@ export interface AuthUserProfile {
   role?: string;
   avatarDataUrl?: string;
   tradeReversalEnabled?: boolean;
+  notificationPreferences?: NotificationPreferences;
 }
 
 export function setAuthUserProfile(user: AuthUserProfile | null | undefined): void {
@@ -23,6 +30,7 @@ export function setAuthUserProfile(user: AuthUserProfile | null | undefined): vo
         role: user.role,
         avatarDataUrl: user.avatarDataUrl,
         tradeReversalEnabled: user.tradeReversalEnabled,
+        notificationPreferences: user.notificationPreferences,
       })
     );
   } catch {
@@ -45,6 +53,7 @@ export function getAuthUserProfile(): AuthUserProfile | null {
       role,
       avatarDataUrl,
       tradeReversalEnabled,
+      notificationPreferences,
     } = parsed as AuthUserProfile;
     return {
       ...(typeof email === "string" ? { email } : {}),
@@ -55,6 +64,10 @@ export function getAuthUserProfile(): AuthUserProfile | null {
       ...(typeof avatarDataUrl === "string" ? { avatarDataUrl } : {}),
       ...(typeof tradeReversalEnabled === "boolean"
         ? { tradeReversalEnabled }
+        : {}),
+      ...(notificationPreferences &&
+      typeof notificationPreferences === "object"
+        ? { notificationPreferences }
         : {}),
     };
   } catch {
