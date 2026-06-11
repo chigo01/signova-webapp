@@ -43,6 +43,45 @@ export interface TopNewsResponse {
   lastUpdated: string;
 }
 
+/**
+ * In-memory stale-while-revalidate cache for the stocks page.
+ *
+ * Module-level state persists for the lifetime of the SPA bundle, so the data
+ * survives client-side navigation (e.g. opening a stock detail and returning).
+ * A full browser reload starts fresh, which is fine.
+ */
+const STOCKS_CACHE_TTL_MS = 2 * 60 * 1000; // 2 min — background revalidate after this
+
+interface StocksCache {
+  recommendations: StockRecommendationsResponse | null;
+  news: NewsArticle[] | null;
+  fetchedAt: number; // epoch ms of last successful load
+}
+
+let stocksCache: StocksCache = {
+  recommendations: null,
+  news: null,
+  fetchedAt: 0,
+};
+
+export function getStocksCache(): StocksCache {
+  return stocksCache;
+}
+
+export function isStocksCacheStale(): boolean {
+  return Date.now() - stocksCache.fetchedAt > STOCKS_CACHE_TTL_MS;
+}
+
+export function setStocksRecommendationsCache(
+  data: StockRecommendationsResponse
+): void {
+  stocksCache = { ...stocksCache, recommendations: data, fetchedAt: Date.now() };
+}
+
+export function setStocksNewsCache(news: NewsArticle[]): void {
+  stocksCache = { ...stocksCache, news, fetchedAt: Date.now() };
+}
+
 /** GET /stocks/recommendations — requires auth in browser (static export). */
 export async function fetchStockRecommendations(): Promise<StockRecommendationsResponse> {
   const token = getAuthToken();

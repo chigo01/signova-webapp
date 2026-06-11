@@ -12,6 +12,10 @@ import { RecommendationsGrid } from "@/components/dashboard/stocks/recommendatio
 import {
   fetchStockRecommendations,
   fetchTopNews,
+  getStocksCache,
+  isStocksCacheStale,
+  setStocksNewsCache,
+  setStocksRecommendationsCache,
   type NewsArticle,
   type StockRecommendation,
   type StockRecommendationsResponse,
@@ -39,12 +43,22 @@ function filterStocks(
 
 export function StocksPageContent() {
   const router = useRouter();
-  const [data, setData] = useState<StockRecommendationsResponse>(emptyData);
-  const [loading, setLoading] = useState(true);
+  // Seed from the in-memory cache so returning to this page (e.g. from a stock
+  // detail) renders instantly without a loading flash.
+  const [data, setData] = useState<StockRecommendationsResponse>(
+    () => getStocksCache().recommendations ?? emptyData
+  );
+  const [loading, setLoading] = useState(
+    () => getStocksCache().recommendations === null
+  );
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [news, setNews] = useState<NewsArticle[]>([]);
-  const [newsLoading, setNewsLoading] = useState(true);
+  const [news, setNews] = useState<NewsArticle[]>(
+    () => getStocksCache().news ?? []
+  );
+  const [newsLoading, setNewsLoading] = useState(
+    () => getStocksCache().news === null
+  );
 
   const filtered = useMemo(() => {
     return {
@@ -53,9 +67,12 @@ export function StocksPageContent() {
     };
   }, [data.watchlist, data.topMovers, searchQuery]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setNewsLoading(true);
+  const load = useCallback(async ({ background = false } = {}) => {
+    // Background refreshes keep the cached data on screen (no spinner).
+    if (!background) {
+      setLoading(true);
+      setNewsLoading(true);
+    }
     setError(null);
 
     const [recsResult, newsResult] = await Promise.allSettled([
@@ -64,29 +81,43 @@ export function StocksPageContent() {
     ]);
 
     if (recsResult.status === "fulfilled") {
+      setStocksRecommendationsCache(recsResult.value);
       setData(recsResult.value);
     } else {
       console.error(recsResult.reason);
-      setError(
-        recsResult.reason instanceof Error
-          ? recsResult.reason.message
-          : "Couldn’t load stock recommendations."
-      );
-      setData(emptyData);
+      // Keep any cached data on screen; only surface an error when we have none.
+      if (getStocksCache().recommendations === null) {
+        setError(
+          recsResult.reason instanceof Error
+            ? recsResult.reason.message
+            : "Couldn’t load stock recommendations."
+        );
+        setData(emptyData);
+      }
     }
     setLoading(false);
 
     if (newsResult.status === "fulfilled") {
+      setStocksNewsCache(newsResult.value.articles);
       setNews(newsResult.value.articles);
     } else {
       console.error(newsResult.reason);
-      setNews([]);
+      if (getStocksCache().news === null) {
+        setNews([]);
+      }
     }
     setNewsLoading(false);
   }, []);
 
   useEffect(() => {
-    void load();
+    const cache = getStocksCache();
+    const hasCache = cache.recommendations !== null && cache.news !== null;
+    if (!hasCache) {
+      void load(); // first load — show spinner, full fetch
+    } else if (isStocksCacheStale()) {
+      void load({ background: true }); // stale-while-revalidate, no spinner
+    }
+    // fresh cache → render as-is, skip the fetch
   }, [load]);
 
   const openTickerFromSearch = useCallback(() => {
