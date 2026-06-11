@@ -53,21 +53,26 @@ const fallbackSupportResistance: Signal["supportResistance"] = {
  * The contrarian-reversal signal was historically labelled with the engine
  * that produced its source picks; those strings are still stored on older
  * signals in the DB, so we rewrite them to neutral wording on the way out.
+ * The "LLM optimized R/R ratio" and "Math optimized" lines appended by
+ * admin-server's exit-target optimizers are dropped entirely for the same
+ * reason (no longer written for new signals, but stored on older ones).
  */
 function sanitizeReasoning(points: string[]): string[] {
-  return points.map((p) =>
-    p
-      // legacy: "Contrarian reverse of Claude worst-5 BUY setup" -> "Contrarian reversal setup (BUY)"
-      .replace(
-        /Contrarian reverse of Claude worst-5 (BUY|SELL) setup/gi,
-        "Contrarian reversal setup ($1)"
-      )
-      // legacy: "Reverse trade setup from Claude worst-5: ..." -> "Reverse trade setup: ..."
-      .replace(/Reverse trade setup from Claude worst-5:/gi, "Reverse trade setup:")
-      // catch-all: remove any remaining provider attribution
-      .replace(/\bClaude(?:'s)?\s+(?:worst|best)-5\b/gi, "model")
-      .replace(/\b(?:Claude|Anthropic)\b/gi, "the engine")
-  );
+  return points
+    .filter((p) => !/^(?:LLM optimized R\/R ratio|Math optimized)/i.test(p))
+    .map((p) =>
+      p
+        // legacy: "Contrarian reverse of Claude worst-5 BUY setup" -> "Contrarian reversal setup (BUY)"
+        .replace(
+          /Contrarian reverse of Claude worst-5 (BUY|SELL) setup/gi,
+          "Contrarian reversal setup ($1)"
+        )
+        // legacy: "Reverse trade setup from Claude worst-5: ..." -> "Reverse trade setup: ..."
+        .replace(/Reverse trade setup from Claude worst-5:/gi, "Reverse trade setup:")
+        // catch-all: remove any remaining provider attribution
+        .replace(/\bClaude(?:'s)?\s+(?:worst|best)-5\b/gi, "model")
+        .replace(/\b(?:Claude|Anthropic)\b/gi, "the engine")
+    );
 }
 
 function parseMonitorKey(monitorKey?: string): Partial<Signal> {
