@@ -110,11 +110,7 @@ export default function TradingViewChart({
           timezone: "Etc/UTC",
           fullscreen: false,
           debug: false,
-          disabled_features: [
-            "use_localstorage_for_settings",
-            "header_symbol_search",
-            "symbol_search_hot_key",
-          ],
+          disabled_features: ["use_localstorage_for_settings"],
           enabled_features: ["hide_left_toolbar_by_default"],
           overrides: {
             "paneProperties.background": "#09090b",

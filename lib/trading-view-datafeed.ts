@@ -1,3 +1,5 @@
+import { searchPairs } from "./supported-pairs";
+
 const ADMIN_API_URL =
   process.env.NEXT_PUBLIC_ADMIN_API_URL || "https://admin-server-syol.onrender.com";
 
@@ -69,12 +71,12 @@ export function createDatafeed(pair: string) {
     },
 
     searchSymbols(
-      _userInput: string,
+      userInput: string,
       _exchange: string,
       _symbolType: string,
       onResult: (items: unknown[]) => void
     ) {
-      onResult([]);
+      onResult(searchPairs(userInput));
     },
 
     resolveSymbol(
