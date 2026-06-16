@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { Users, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAuthUserProfile } from "@/lib/auth-user";
 import { logout as performLogout } from "@/lib/logout";
@@ -15,7 +16,14 @@ import SignalVault from "@/assets/icons/vault.svg";
 import StockOptions from "@/assets/icons/stock.svg";
 import Journal from "@/assets/icons/journal.svg";
 
-const sidebarItems = [
+interface SidebarItem {
+  title: string;
+  href: string;
+  icon?: string;
+  lucideIcon?: LucideIcon;
+}
+
+const sidebarItems: SidebarItem[] = [
   {
     title: "Dashboard",
     href: "/dashboard",
@@ -35,6 +43,11 @@ const sidebarItems = [
     title: "Trading journal",
     href: "/dashboard/journal",
     icon: Journal,
+  },
+  {
+    title: "Affiliate",
+    href: "/dashboard/referrals",
+    lucideIcon: Users,
   },
 ];
 
@@ -154,6 +167,7 @@ export function Sidebar() {
                 ? pathname === "/dashboard/signal-vault" ||
                   pathname === "/dashboard/signals"
                 : pathname === item.href;
+            const LucideIcon = item.lucideIcon;
             return (
               <Link
                 key={item.href}
@@ -167,13 +181,17 @@ export function Sidebar() {
                     : "border border-transparent text-[#494949] hover:bg-zinc-800/50 hover:text-white"
                 )}
               >
-                <Image
-                  src={item.icon}
-                  alt={item.title}
-                  width={16}
-                  height={16}
-                  className="h-4 w-4"
-                />
+                {LucideIcon ? (
+                  <LucideIcon className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+                ) : (
+                  <Image
+                    src={item.icon!}
+                    alt={item.title}
+                    width={16}
+                    height={16}
+                    className="h-4 w-4"
+                  />
+                )}
                 {item.title}
               </Link>
             );

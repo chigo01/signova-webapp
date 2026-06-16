@@ -16,15 +16,35 @@ interface AuthFormProps {
   type: "login" | "register";
 }
 
+const REFERRAL_CODE_STORAGE_KEY = "signova_ref_code";
+
 export function AuthForm({ type }: AuthFormProps) {
   const [step, setStep] = React.useState<"email" | "otp">("email");
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
   const [email, setEmail] = React.useState("");
   const [phone, setPhone] = React.useState("");
   const [otp, setOtp] = React.useState("");
+  const [referralCode, setReferralCode] = React.useState<string | undefined>();
 
   const API_URL =
     process.env.NEXT_PUBLIC_API_URL || "https://web-server-4gpe.onrender.com";
+
+  // Capture an inbound referral code (?ref=CODE) and persist it so it survives
+  // the email→OTP step and navigation between /login and /register.
+  React.useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search)
+      .get("ref")
+      ?.trim();
+    if (fromUrl) {
+      window.localStorage.setItem(REFERRAL_CODE_STORAGE_KEY, fromUrl);
+      setReferralCode(fromUrl);
+      return;
+    }
+    const stored = window.localStorage
+      .getItem(REFERRAL_CODE_STORAGE_KEY)
+      ?.trim();
+    if (stored) setReferralCode(stored);
+  }, []);
 
   const googleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
@@ -32,7 +52,10 @@ export function AuthForm({ type }: AuthFormProps) {
         const res = await fetch(`${API_URL}/auth/google`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ access_token: tokenResponse.access_token }),
+          body: JSON.stringify({
+            access_token: tokenResponse.access_token,
+            referralCode,
+          }),
         });
 
         if (!res.ok) {
@@ -77,6 +100,7 @@ export function AuthForm({ type }: AuthFormProps) {
               : undefined,
           phone:
             type === "register" && phone.trim() ? phone.trim() : undefined,
+          referralCode,
         }),
       });
 

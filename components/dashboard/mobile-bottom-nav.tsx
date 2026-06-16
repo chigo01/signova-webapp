@@ -7,6 +7,7 @@ import {
   LineChart,
   PieChart,
   BarChart3,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +16,7 @@ const items = [
   { title: "Signal", href: "/dashboard/signal-vault", Icon: LineChart },
   { title: "Stocks", href: "/dashboard/stocks", Icon: PieChart },
   { title: "Journal", href: "/dashboard/journal", Icon: BarChart3 },
+  { title: "Affiliate", href: "/dashboard/referrals", Icon: Users },
 ] as const;
 
 export function MobileBottomNav() {
