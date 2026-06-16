@@ -1,15 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Copy, Link2, TriangleAlert } from "lucide-react";
 
 interface ReferralCodeCardProps {
   code: string;
+  /** Server-generated fallback; overridden client-side with the live origin. */
   shareUrl: string;
 }
 
-export function ReferralCodeCard({ code, shareUrl }: ReferralCodeCardProps) {
+export function ReferralCodeCard({
+  code,
+  shareUrl: fallbackShareUrl,
+}: ReferralCodeCardProps) {
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
+
+  // Build the share link from the web app's own origin so it always points at
+  // the real domain (e.g. https://web.signova.app), independent of the server's
+  // FRONTEND_URL env. Falls back to the server value before hydration.
+  const [shareUrl, setShareUrl] = useState(fallbackShareUrl);
+  useEffect(() => {
+    setShareUrl(`${window.location.origin}/register?ref=${code}`);
+  }, [code]);
 
   async function copy(value: string, which: "code" | "link") {
     try {
