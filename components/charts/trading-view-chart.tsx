@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { createDatafeed, RESOLUTION_TO_MS } from "@/lib/trading-view-datafeed";
+import { useEffect, useRef } from "react";
+import { createDatafeed } from "@/lib/trading-view-datafeed";
 
 declare global {
   interface Window {
@@ -18,17 +18,6 @@ interface TradingViewWidgetInstance {
       point: { price: number; time?: number },
       options: Record<string, unknown>
     ): unknown;
-    createStudy(
-      name: string,
-      forceOverlay: boolean,
-      lock: boolean,
-      inputs?: unknown[],
-      overrides?: Record<string, unknown>
-    ): unknown;
-    setVisibleRange(
-      range: { from: number; to: number },
-      options?: Record<string, unknown>
-    ): Promise<void> | void;
   };
   remove(): void;
 }
@@ -101,21 +90,6 @@ export default function TradingViewChart({
 }: TradingViewChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetRef = useRef<TradingViewWidgetInstance | null>(null);
-  const [isMobile, setIsMobile] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.matchMedia("(max-width: 1023px)").matches
-  );
-
-  // Re-create the widget with a mobile-optimized layout when crossing the
-  // breakpoint (matches the `lg:` Tailwind breakpoint).
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mql = window.matchMedia("(max-width: 1023px)");
-    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -136,19 +110,7 @@ export default function TradingViewChart({
           timezone: "Etc/UTC",
           fullscreen: false,
           debug: false,
-          disabled_features: [
-            "use_localstorage_for_settings",
-            // On mobile, strip the chrome so candles fill the screen like the
-            // TradingView app (the page supplies a fixed symbol + interval).
-            ...(isMobile
-              ? [
-                  "header_widget",
-                  "timeframes_toolbar",
-                  "control_bar",
-                  "legend_widget",
-                ]
-              : []),
-          ],
+          disabled_features: ["use_localstorage_for_settings"],
           enabled_features: ["hide_left_toolbar_by_default"],
           overrides: {
             "paneProperties.background": "#09090b",
@@ -157,43 +119,14 @@ export default function TradingViewChart({
             "paneProperties.horzGridProperties.color": "#1f1f23",
             "scalesProperties.textColor": "#a1a1aa",
           },
-          studies_overrides: {
-            "volume.volume.color.0": "#ef5350",
-            "volume.volume.color.1": "#26a69a",
-            "volume.volume.transparency": 70,
-            "volume.volume ma.visible": false,
-          },
         });
         widgetRef.current = widget;
 
-        widget.onChartReady(() => {
-          if (disposed) return;
-          const chart = widget.activeChart();
-
-          // Volume histogram (datafeed already returns volume per bar).
-          try {
-            chart.createStudy("Volume", false, false);
-          } catch (err) {
-            console.error("[TradingViewChart] failed to add volume study", err);
-          }
-
-          // Comfortable default zoom: show roughly the last ~55 bars so candles
-          // render wide like the TradingView app instead of hundreds of thin
-          // bars crammed across the width.
-          try {
-            const stepMs = RESOLUTION_TO_MS[mapInterval(interval)];
-            if (stepMs) {
-              const barsToShow = isMobile ? 55 : 90;
-              const to = Math.floor(Date.now() / 1000);
-              const from = to - Math.floor((stepMs / 1000) * barsToShow);
-              chart.setVisibleRange({ from, to });
-            }
-          } catch (err) {
-            console.error("[TradingViewChart] failed to set visible range", err);
-          }
-
-          if (signal) {
+        if (signal) {
+          widget.onChartReady(() => {
+            if (disposed) return;
             try {
+              const chart = widget.activeChart();
               const lines: Array<{ price: number; color: string; label: string }> = [
                 { price: signal.entryPrice, color: "#ffffff", label: "Entry" },
                 { price: signal.exitTargets.stopLoss, color: "#f43f5e", label: "SL" },
@@ -224,8 +157,8 @@ export default function TradingViewChart({
             } catch (err) {
               console.error("[TradingViewChart] failed to draw price lines", err);
             }
-          }
-        });
+          });
+        }
       })
       .catch((err) => {
         console.error("[TradingViewChart] script load failed", err);
@@ -243,7 +176,6 @@ export default function TradingViewChart({
   }, [
     symbol,
     interval,
-    isMobile,
     signal?.entryPrice,
     signal?.exitTargets.stopLoss,
     signal?.exitTargets.takeProfit1,

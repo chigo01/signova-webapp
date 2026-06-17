@@ -15,7 +15,7 @@ const RESOLUTION_TO_TIMEFRAME: Record<string, string> = {
   "1D": "daily",
 };
 
-export const RESOLUTION_TO_MS: Record<string, number> = {
+const RESOLUTION_TO_MS: Record<string, number> = {
   "1": 60_000,
   "5": 300_000,
   "15": 900_000,

@@ -20,21 +20,6 @@ function TradingViewWidget({
   const isMounted = useRef(true);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isMobile, setIsMobile] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.matchMedia("(max-width: 1023px)").matches
-  );
-
-  // Re-initialize the widget with a clean, full-bleed layout when crossing the
-  // breakpoint (matches the `lg:` Tailwind breakpoint).
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mql = window.matchMedia("(max-width: 1023px)");
-    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }, []);
 
   useEffect(() => {
     if (!isFullscreen) return;
@@ -69,8 +54,8 @@ function TradingViewWidget({
           "calendar": false,
           "details": false,
           "hide_side_toolbar": true,
-          "hide_top_toolbar": ${isMobile},
-          "hide_legend": ${isMobile},
+          "hide_top_toolbar": false,
+          "hide_legend": false,
           "hide_volume": false,
           "hotlist": false,
           "interval": ${JSON.stringify(interval)},
@@ -145,7 +130,7 @@ function TradingViewWidget({
       if (timeoutId) window.clearTimeout(timeoutId);
       if (container.current) container.current.innerHTML = "";
     };
-  }, [symbol, interval, isMobile]);
+  }, [symbol, interval]);
 
   return (
     <div
