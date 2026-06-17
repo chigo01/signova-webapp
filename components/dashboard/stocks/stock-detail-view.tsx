@@ -230,7 +230,7 @@ export function StockDetailView({ symbol }: Props) {
           </div>
         </header>
 
-        <div className="h-[min(62vh,720px)] min-h-[380px] w-full overflow-hidden rounded-lg border border-zinc-800 bg-[#0f0f0f]">
+        <div className="h-[min(78vh,720px)] min-h-[420px] w-full overflow-hidden rounded-lg border border-zinc-800 bg-[#0f0f0f] lg:h-[min(62vh,720px)] lg:min-h-[380px]">
           <TradingViewWidget
             symbol={tvSymbol}
             interval={CHART_INTERVAL}

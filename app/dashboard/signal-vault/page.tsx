@@ -294,7 +294,7 @@ export default function SignalVaultPage() {
         {/* Chart column */}
         <section className="flex min-h-0 flex-col lg:h-full lg:min-h-0 lg:flex-1">
           <div className="relative flex min-h-0 flex-1 flex-col px-2 pb-2 pt-1 lg:h-full lg:min-h-0">
-            <div className="h-[min(42vh,380px)] max-h-[420px] min-h-[280px] w-full flex-1 sm:h-[min(50vh,480px)] sm:max-h-[520px] lg:h-full lg:max-h-[760px] lg:min-h-[400px]">
+            <div className="h-[min(68vh,560px)] max-h-[620px] min-h-[360px] w-full flex-1 sm:h-[min(70vh,640px)] sm:max-h-[680px] lg:h-full lg:max-h-[760px] lg:min-h-[400px]">
               <TradingViewChart
                 symbol={chartSymbol}
                 interval="1D"
