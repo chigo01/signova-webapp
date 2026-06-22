@@ -299,6 +299,7 @@ export default function SignalVaultPage() {
                 symbol={chartSymbol}
                 interval="1D"
                 signal={playingSignal ?? undefined}
+                showPresetControls
               />
             </div>
           </div>

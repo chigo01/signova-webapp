@@ -1,9 +1,15 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createDatafeed } from "@/lib/trading-view-datafeed";
 import { createSaveLoadAdapter } from "@/lib/trading-view-save-load-adapter";
 import { getAuthUserProfile } from "@/lib/auth-user";
+import {
+  getDefaultStudyTemplate,
+  listStudyTemplatesWithDefault,
+  setDefaultStudyTemplate,
+  type StudyTemplateSummary,
+} from "@/lib/chart-presets";
 
 declare global {
   interface Window {
@@ -20,6 +26,7 @@ interface TradingViewWidgetInstance {
       point: { price: number; time?: number },
       options: Record<string, unknown>
     ): unknown;
+    applyStudyTemplate(template: object): void;
   };
   remove(): void;
 }
@@ -37,6 +44,9 @@ interface TradingViewChartProps {
   symbol: string;
   interval?: string;
   signal?: SignalLines;
+  // When true, show the "default analysis preset" picker and auto-apply the
+  // trader's default indicator template on every new signal/symbol.
+  showPresetControls?: boolean;
 }
 
 const TIMEFRAME_TO_RESOLUTION: Record<string, string> = {
@@ -54,6 +64,21 @@ const TIMEFRAME_TO_RESOLUTION: Record<string, string> = {
 function mapInterval(tf: string | undefined): string {
   if (!tf) return "60";
   return TIMEFRAME_TO_RESOLUTION[tf] || tf;
+}
+
+// Apply a saved study-template `content` string (JSON) to the current chart.
+// Study templates are symbol-agnostic, so this layers the trader's indicators
+// onto whatever symbol is loaded without switching symbols.
+function applyTemplateContent(
+  widget: TradingViewWidgetInstance,
+  content: string
+): void {
+  try {
+    const parsed = JSON.parse(content) as object;
+    widget.activeChart().applyStudyTemplate(parsed);
+  } catch (err) {
+    console.error("[TradingViewChart] failed to apply study template", err);
+  }
 }
 
 let scriptPromise: Promise<void> | null = null;
@@ -89,9 +114,41 @@ export default function TradingViewChart({
   symbol,
   interval,
   signal,
+  showPresetControls = false,
 }: TradingViewChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetRef = useRef<TradingViewWidgetInstance | null>(null);
+
+  const [templates, setTemplates] = useState<StudyTemplateSummary[]>([]);
+  const defaultName = templates.find((t) => t.isDefault)?.name ?? "";
+
+  const refreshTemplates = useCallback(() => {
+    if (!showPresetControls) return;
+    listStudyTemplatesWithDefault().then(setTemplates).catch(() => {});
+  }, [showPresetControls]);
+
+  useEffect(() => {
+    refreshTemplates();
+  }, [refreshTemplates]);
+
+  const handleSelectDefault = useCallback(
+    async (name: string) => {
+      if (!name) return;
+      try {
+        await setDefaultStudyTemplate(name);
+        // Reflect the change locally and apply it to the live chart now.
+        setTemplates((prev) =>
+          prev.map((t) => ({ ...t, isDefault: t.name === name }))
+        );
+        const tpl = await getDefaultStudyTemplate();
+        const widget = widgetRef.current;
+        if (tpl && widget) applyTemplateContent(widget, tpl.content);
+      } catch (err) {
+        console.error("[TradingViewChart] failed to set default template", err);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     let disposed = false;
@@ -132,9 +189,11 @@ export default function TradingViewChart({
         });
         widgetRef.current = widget;
 
-        if (signal) {
-          widget.onChartReady(() => {
-            if (disposed) return;
+        widget.onChartReady(() => {
+          if (disposed) return;
+
+          // Draw the signal's entry / SL / TP lines (not saved into presets).
+          if (signal) {
             try {
               const chart = widget.activeChart();
               const lines: Array<{ price: number; color: string; label: string }> = [
@@ -167,8 +226,18 @@ export default function TradingViewChart({
             } catch (err) {
               console.error("[TradingViewChart] failed to draw price lines", err);
             }
-          });
-        }
+          }
+
+          // Auto-apply the trader's default indicator template to this symbol.
+          if (showPresetControls) {
+            getDefaultStudyTemplate()
+              .then((tpl) => {
+                if (disposed || !tpl) return;
+                applyTemplateContent(widget, tpl.content);
+              })
+              .catch(() => {});
+          }
+        });
       })
       .catch((err) => {
         console.error("[TradingViewChart] script load failed", err);
@@ -186,6 +255,7 @@ export default function TradingViewChart({
   }, [
     symbol,
     interval,
+    showPresetControls,
     signal?.entryPrice,
     signal?.exitTargets.stopLoss,
     signal?.exitTargets.takeProfit1,
@@ -193,8 +263,39 @@ export default function TradingViewChart({
   ]);
 
   return (
-    <div className="h-full w-full overflow-hidden rounded-lg border border-[#1D1D1D] bg-[#121212]">
-      <div ref={containerRef} className="h-full w-full" />
+    <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-[#1D1D1D] bg-[#121212]">
+      {showPresetControls && (
+        <div className="flex items-center gap-2 border-b border-[#1D1D1D] px-3 py-2">
+          <label
+            htmlFor="tv-default-preset"
+            className="text-xs font-medium text-zinc-400"
+          >
+            Default preset
+          </label>
+          <select
+            id="tv-default-preset"
+            value={defaultName}
+            onFocus={refreshTemplates}
+            onChange={(e) => handleSelectDefault(e.target.value)}
+            disabled={templates.length === 0}
+            className="h-8 rounded-md border border-zinc-700 bg-zinc-900 px-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-zinc-600 disabled:opacity-50"
+          >
+            {templates.length === 0 ? (
+              <option value="">No saved indicator templates</option>
+            ) : (
+              <>
+                <option value="">Select a template…</option>
+                {templates.map((t) => (
+                  <option key={t.name} value={t.name}>
+                    {t.name}
+                  </option>
+                ))}
+              </>
+            )}
+          </select>
+        </div>
+      )}
+      <div ref={containerRef} className="h-full w-full flex-1" />
     </div>
   );
 }
