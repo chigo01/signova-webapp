@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import { createDatafeed } from "@/lib/trading-view-datafeed";
+import { createSaveLoadAdapter } from "@/lib/trading-view-save-load-adapter";
+import { getAuthUserProfile } from "@/lib/auth-user";
 
 declare global {
   interface Window {
@@ -98,6 +100,11 @@ export default function TradingViewChart({
       .then(() => {
         if (disposed || !containerRef.current || !window.TradingView) return;
 
+        // Stable per-user id so saved layouts associate correctly in the UI.
+        // All persistence is scoped server-side by the JWT, so this value is
+        // only used by the library to namespace the save/load experience.
+        const userKey = getAuthUserProfile()?.email || "signova-user";
+
         const widget = new window.TradingView.widget({
           container: containerRef.current,
           library_path: "/charting_library/",
@@ -110,8 +117,11 @@ export default function TradingViewChart({
           timezone: "Etc/UTC",
           fullscreen: false,
           debug: false,
+          client_id: "signova",
+          user_id: userKey,
+          save_load_adapter: createSaveLoadAdapter(),
           disabled_features: ["use_localstorage_for_settings"],
-          enabled_features: ["hide_left_toolbar_by_default"],
+          enabled_features: ["hide_left_toolbar_by_default", "study_templates"],
           overrides: {
             "paneProperties.background": "#09090b",
             "paneProperties.backgroundType": "solid",
