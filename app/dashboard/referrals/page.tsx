@@ -30,6 +30,8 @@ import { MetricCard } from "@/components/dashboard/referrals/metric-card";
 import { ReferralCodeCard } from "@/components/dashboard/referrals/referral-code-card";
 import { ReferralTransactionsTable } from "@/components/dashboard/referrals/referral-transactions-table";
 import { Leaderboard } from "@/components/dashboard/referrals/leaderboard";
+import { useAuthState } from "@/components/auth/auth-provider";
+import { LockedOverlay } from "@/components/auth/locked-overlay";
 import {
   FaqAccordion,
   type FaqItem,
@@ -107,6 +109,28 @@ const TABS: { id: Tab; label: string }[] = [
 const PAYOUT_NOTE =
   "All referral earnings are collected here and automatically converted to cash at the end of each payout cycle.";
 
+/** Placeholder shown (blurred, behind the login overlay) to guests. */
+const GUEST_DEMO_OVERVIEW: ReferralOverview = {
+  code: "SIGXXXX",
+  shareUrl: "https://web.signova.app/register?ref=SIGXXXX",
+  stats: {
+    totalEarningsUsdMicro: 482_000_000,
+    totalReferrals: 37,
+    sigcoins: 1_240,
+    leaderboardRank: 12,
+  },
+  wallet: {
+    balanceUsdMicro: 312_000_000,
+    pendingUsdMicro: 170_000_000,
+  },
+};
+
+const GUEST_DEMO_LEADERBOARD: LeaderboardEntry[] = [
+  { rank: 1, name: "A. Trader", totalEarningsUsdMicro: 2_100_000_000, isCurrentUser: false },
+  { rank: 2, name: "M. Pips", totalEarningsUsdMicro: 1_640_000_000, isCurrentUser: false },
+  { rank: 3, name: "K. Swing", totalEarningsUsdMicro: 980_000_000, isCurrentUser: false },
+];
+
 function WalletBalances({
   balanceUsdMicro,
   pendingUsdMicro,
@@ -151,6 +175,7 @@ function PayoutNote() {
 }
 
 export default function ReferralsPage() {
+  const { isGuest } = useAuthState();
   const [tab, setTab] = useState<Tab>("metrics");
   const [overview, setOverview] = useState<ReferralOverview | null>(null);
   const [transactions, setTransactions] = useState<ReferralTransactionRow[]>([]);
@@ -159,6 +184,14 @@ export default function ReferralsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Guests never hit the authed referrals API — show blurred placeholders
+    // behind the login overlay.
+    if (isGuest) {
+      setOverview(GUEST_DEMO_OVERVIEW);
+      setLeaderboard(GUEST_DEMO_LEADERBOARD);
+      setLoading(false);
+      return;
+    }
     const controller = new AbortController();
     void (async () => {
       try {
@@ -180,9 +213,9 @@ export default function ReferralsPage() {
       }
     })();
     return () => controller.abort();
-  }, []);
+  }, [isGuest]);
 
-  return (
+  const content = (
     <div className="mx-auto w-full max-w-6xl p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-white">
@@ -230,6 +263,18 @@ export default function ReferralsPage() {
       )}
     </div>
   );
+
+  if (isGuest) {
+    return (
+      <div className="min-h-[calc(100dvh-4rem)]">
+        <LockedOverlay message="Log in to access your affiliate account">
+          {content}
+        </LockedOverlay>
+      </div>
+    );
+  }
+
+  return content;
 }
 
 function MetricsTab({
