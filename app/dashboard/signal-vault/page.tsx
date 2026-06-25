@@ -12,13 +12,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Signal } from "@/types/signal";
-import { fetchApprovedSignals, playSignal } from "@/lib/signals";
+import { fetchApprovedSignals, fetchPublicSignals, playSignal } from "@/lib/signals";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { pairToForexSymbol } from "@/lib/pair-to-forex-symbol";
 import TradingViewChart from "@/components/charts/trading-view-chart";
 import { useAuthState } from "@/components/auth/auth-provider";
-import { LockedOverlay } from "@/components/auth/locked-overlay";
 
 function formatLevelValue(value: number): string {
   // Keep signal levels compact so they never overflow the TP/SL boxes.
@@ -28,20 +27,41 @@ function formatLevelValue(value: number): string {
   return value.toFixed(8);
 }
 
+/**
+ * Blurred dummy value shown to guests in place of a real signal level. The
+ * real numbers never reach the guest (the public endpoint omits them), so this
+ * is purely a visual placeholder that keeps the card layout intact.
+ */
+function MaskedValue({ className }: { className?: string }) {
+  return (
+    <span aria-hidden className={cn("select-none blur-[5px]", className)}>
+      0.00000
+    </span>
+  );
+}
+
 /* ─── Signal Card (matches image design) ─── */
 function VaultSignalCard({
   signal,
   onPlay,
+  locked = false,
 }: {
   signal: Signal;
   onPlay: (signal: Signal) => void;
+  /** Guest mode: blur the numeric levels and gate the play action behind auth. */
+  locked?: boolean;
 }) {
   const [isPlaying, setIsPlaying] = useState(false);
+  const { promptAuth } = useAuthState();
   const isBuy = signal.direction === "BUY";
   const directionColor = isBuy ? "text-emerald-400" : "text-red-400";
 
   const handlePlay = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (locked) {
+      promptAuth("Log in to play live signals");
+      return;
+    }
     try {
       setIsPlaying(true);
       await playSignal(signal);
@@ -66,7 +86,7 @@ function VaultSignalCard({
       <div className="flex items-center justify-between rounded-lg bg-zinc-900/80 px-3 py-2.5">
         <span className="text-xs text-zinc-400">Entry</span>
         <span className="text-xs font-mono text-white">
-          {signal.entryPrice}
+          {locked ? <MaskedValue /> : signal.entryPrice}
         </span>
       </div>
 
@@ -79,24 +99,32 @@ function VaultSignalCard({
               TP1
             </span>
           </div>
-          <span
-            className="block w-full truncate text-center text-xs font-mono text-white"
-            title={String(signal.exitTargets.takeProfit1)}
-          >
-            {formatLevelValue(signal.exitTargets.takeProfit1)}
-          </span>
+          {locked ? (
+            <MaskedValue className="block w-full text-center text-xs font-mono text-white" />
+          ) : (
+            <span
+              className="block w-full truncate text-center text-xs font-mono text-white"
+              title={String(signal.exitTargets.takeProfit1)}
+            >
+              {formatLevelValue(signal.exitTargets.takeProfit1)}
+            </span>
+          )}
         </div>
         <div className="flex flex-col items-center justify-center gap-[10px] rounded-[4px] border border-[#F63B6B]/30 bg-[#F63B6B]/10 p-[8px] text-center">
           <div className="flex items-center gap-1.5">
             <ShieldAlert className="h-3 w-3 text-red-400" />
             <span className="text-[10px] font-semibold text-red-400">SL</span>
           </div>
-          <span
-            className="block w-full truncate text-center text-xs font-mono text-white"
-            title={String(signal.exitTargets.stopLoss)}
-          >
-            {formatLevelValue(signal.exitTargets.stopLoss)}
-          </span>
+          {locked ? (
+            <MaskedValue className="block w-full text-center text-xs font-mono text-white" />
+          ) : (
+            <span
+              className="block w-full truncate text-center text-xs font-mono text-white"
+              title={String(signal.exitTargets.stopLoss)}
+            >
+              {formatLevelValue(signal.exitTargets.stopLoss)}
+            </span>
+          )}
         </div>
         <div className="col-span-2 flex flex-col items-center justify-center gap-[10px] rounded-[4px] border border-[#10C29C]/30 bg-[#10C29C]/10 p-[8px] text-center">
           <div className="flex items-center gap-1.5">
@@ -105,17 +133,21 @@ function VaultSignalCard({
               TP2
             </span>
           </div>
-          <span
-            className="block w-full truncate text-center text-xs font-mono text-white"
-            title={String(signal.exitTargets.takeProfit2)}
-          >
-            {formatLevelValue(signal.exitTargets.takeProfit2)}
-          </span>
+          {locked ? (
+            <MaskedValue className="block w-full text-center text-xs font-mono text-white" />
+          ) : (
+            <span
+              className="block w-full truncate text-center text-xs font-mono text-white"
+              title={String(signal.exitTargets.takeProfit2)}
+            >
+              {formatLevelValue(signal.exitTargets.takeProfit2)}
+            </span>
+          )}
         </div>
       </div>
 
       {/* Reasoning */}
-      {signal.reasoning && signal.reasoning.length > 0 && (
+      {!locked && signal.reasoning && signal.reasoning.length > 0 && (
         <ul className="space-y-1 text-[11px] leading-relaxed text-zinc-500">
           {signal.reasoning.map((point, index) => (
             <li key={index} className="flex gap-1.5">
@@ -138,47 +170,15 @@ function VaultSignalCard({
         ) : (
           <Play className="h-4 w-4 fill-current text-black" />
         )}
-        {isPlaying ? "Playing..." : "Play Signal"}
+        {isPlaying ? "Playing..." : locked ? "Log in to play" : "Play Signal"}
       </button>
     </div>
   );
 }
 
-/**
- * Teaser cards shown (blurred, behind the login overlay) to guests so the
- * vault looks populated instead of empty. Only the fields VaultSignalCard reads
- * are populated; cast to Signal to satisfy the type without inventing the rest.
- */
-const GUEST_PLACEHOLDER_SIGNALS: Signal[] = [
-  {
-    _id: "guest-1",
-    pair: "EUR/USD",
-    direction: "BUY",
-    entryPrice: 1.0842,
-    exitTargets: { stopLoss: 1.0795, takeProfit1: 1.0901, takeProfit2: 1.0958 },
-    reasoning: ["Momentum confirmed on the 1H", "Bullish structure intact"],
-  } as Signal,
-  {
-    _id: "guest-2",
-    pair: "GBP/USD",
-    direction: "SELL",
-    entryPrice: 1.2713,
-    exitTargets: { stopLoss: 1.2768, takeProfit1: 1.2651, takeProfit2: 1.2594 },
-    reasoning: ["Rejected at resistance", "Bearish divergence on RSI"],
-  } as Signal,
-  {
-    _id: "guest-3",
-    pair: "XAU/USD",
-    direction: "BUY",
-    entryPrice: 2031.4,
-    exitTargets: { stopLoss: 2018.0, takeProfit1: 2049.5, takeProfit2: 2066.0 },
-    reasoning: ["Demand zone holding", "Trend continuation setup"],
-  } as Signal,
-];
-
 /* ─── Main Page ─── */
 export default function SignalVaultPage() {
-  const { isGuest } = useAuthState();
+  const { isGuest, promptAuth } = useAuthState();
   const [signals, setSignals] = useState<Signal[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoadingSignals, setIsLoadingSignals] = useState(true);
@@ -188,11 +188,30 @@ export default function SignalVaultPage() {
   const [playingSignal, setPlayingSignal] = useState<Signal | null>(null);
 
   const loadSignals = useCallback(async () => {
-    // Guests never hit the authed signals API — show blurred placeholders.
+    // Guests hit the public endpoint, which returns real pairs/directions but
+    // no numbers — the card blurs the (absent) numeric levels. Mapped into the
+    // minimal Signal shape VaultSignalCard reads in locked mode.
     if (isGuest) {
-      setSignals(GUEST_PLACEHOLDER_SIGNALS);
-      setIsLoadingSignals(false);
-      setSignalsLoadError(null);
+      try {
+        setIsLoadingSignals(true);
+        setSignalsLoadError(null);
+        const data = await fetchPublicSignals();
+        setSignals(
+          data.map(
+            (s) =>
+              ({
+                _id: s._id,
+                pair: s.pair,
+                direction: s.direction,
+              }) as Signal
+          )
+        );
+      } catch (error) {
+        console.error("Failed to load public signals:", error);
+        setSignals([]);
+      } finally {
+        setIsLoadingSignals(false);
+      }
       return;
     }
     try {
@@ -240,14 +259,24 @@ export default function SignalVaultPage() {
         </button>
       </div>
 
-      <div className="border-b border-zinc-800/70 px-4 py-2 lg:px-4">
-        <Link
-          href="/dashboard/history"
-          className="text-[11px] font-medium text-zinc-500 transition-colors hover:text-zinc-300"
+      {isGuest ? (
+        <button
+          type="button"
+          onClick={() => promptAuth("Log in to unlock entries & targets")}
+          className="w-full border-b border-zinc-800/70 px-4 py-2 text-left text-[11px] font-medium text-emerald-300 transition-colors hover:text-emerald-200 lg:px-4"
         >
-          View signal history
-        </Link>
-      </div>
+          Log in to unlock entries &amp; targets →
+        </button>
+      ) : (
+        <div className="border-b border-zinc-800/70 px-4 py-2 lg:px-4">
+          <Link
+            href="/dashboard/history"
+            className="text-[11px] font-medium text-zinc-500 transition-colors hover:text-zinc-300"
+          >
+            View signal history
+          </Link>
+        </div>
+      )}
 
       <div
         className={cn(
@@ -302,6 +331,7 @@ export default function SignalVaultPage() {
               key={signal._id}
               signal={signal}
               onPlay={handleSignalPlay}
+              locked={isGuest}
             />
           ))
         )}
@@ -352,9 +382,7 @@ export default function SignalVaultPage() {
         {/* Active signals — full width card on mobile, sidebar on desktop */}
         <aside className="mt-1 flex min-h-0 flex-col rounded-2xl border border-zinc-800/90 bg-[#121212] lg:mt-0 lg:h-full lg:w-80 lg:shrink-0 lg:rounded-none lg:border-b-0 lg:border-l lg:border-t-0 lg:bg-zinc-950/50">
           <div className="lg:flex lg:h-full lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden">
-            <LockedOverlay message="Log in to view live signals">
-              {signalsPanel}
-            </LockedOverlay>
+            {signalsPanel}
           </div>
         </aside>
       </div>

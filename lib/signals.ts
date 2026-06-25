@@ -213,6 +213,32 @@ export async function fetchApprovedSignals(): Promise<Signal[]> {
   }
 }
 
+/**
+ * Guest-facing signals: the public endpoint returns only the pair and
+ * direction (no entry/TP/SL), so logged-out users can see what pairs are
+ * active without the real numbers ever reaching the browser. No auth header.
+ */
+export interface PublicSignal {
+  _id: string;
+  pair: string;
+  direction: SignalDirection;
+}
+
+export async function fetchPublicSignals(): Promise<PublicSignal[]> {
+  try {
+    const res = await fetch(`${API_URL}/signals/approved/public`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data?.signals) ? (data.signals as PublicSignal[]) : [];
+  } catch (error) {
+    console.error("Error fetching public signals:", error);
+    return [];
+  }
+}
+
 export async function playSignal(signal: Signal): Promise<void> {
   const token = getAuthToken();
   const payload = {

@@ -51,12 +51,13 @@ export function MobileHeader() {
             Sign up
           </button>
         ) : (
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-700 text-xs font-medium text-white"
-            aria-hidden
+          <Link
+            href="/dashboard/settings"
+            aria-label="Settings"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-700 text-xs font-medium text-white transition-colors hover:ring-2 hover:ring-zinc-600"
           >
             {initials}
-          </div>
+          </Link>
         )}
       </div>
     </header>
