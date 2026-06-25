@@ -17,6 +17,8 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { pairToForexSymbol } from "@/lib/pair-to-forex-symbol";
 import TradingViewChart from "@/components/charts/trading-view-chart";
+import { useAuthState } from "@/components/auth/auth-provider";
+import { LockedOverlay } from "@/components/auth/locked-overlay";
 
 function formatLevelValue(value: number): string {
   // Keep signal levels compact so they never overflow the TP/SL boxes.
@@ -142,8 +144,41 @@ function VaultSignalCard({
   );
 }
 
+/**
+ * Teaser cards shown (blurred, behind the login overlay) to guests so the
+ * vault looks populated instead of empty. Only the fields VaultSignalCard reads
+ * are populated; cast to Signal to satisfy the type without inventing the rest.
+ */
+const GUEST_PLACEHOLDER_SIGNALS: Signal[] = [
+  {
+    _id: "guest-1",
+    pair: "EUR/USD",
+    direction: "BUY",
+    entryPrice: 1.0842,
+    exitTargets: { stopLoss: 1.0795, takeProfit1: 1.0901, takeProfit2: 1.0958 },
+    reasoning: ["Momentum confirmed on the 1H", "Bullish structure intact"],
+  } as Signal,
+  {
+    _id: "guest-2",
+    pair: "GBP/USD",
+    direction: "SELL",
+    entryPrice: 1.2713,
+    exitTargets: { stopLoss: 1.2768, takeProfit1: 1.2651, takeProfit2: 1.2594 },
+    reasoning: ["Rejected at resistance", "Bearish divergence on RSI"],
+  } as Signal,
+  {
+    _id: "guest-3",
+    pair: "XAU/USD",
+    direction: "BUY",
+    entryPrice: 2031.4,
+    exitTargets: { stopLoss: 2018.0, takeProfit1: 2049.5, takeProfit2: 2066.0 },
+    reasoning: ["Demand zone holding", "Trend continuation setup"],
+  } as Signal,
+];
+
 /* ─── Main Page ─── */
 export default function SignalVaultPage() {
+  const { isGuest } = useAuthState();
   const [signals, setSignals] = useState<Signal[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoadingSignals, setIsLoadingSignals] = useState(true);
@@ -153,6 +188,13 @@ export default function SignalVaultPage() {
   const [playingSignal, setPlayingSignal] = useState<Signal | null>(null);
 
   const loadSignals = useCallback(async () => {
+    // Guests never hit the authed signals API — show blurred placeholders.
+    if (isGuest) {
+      setSignals(GUEST_PLACEHOLDER_SIGNALS);
+      setIsLoadingSignals(false);
+      setSignalsLoadError(null);
+      return;
+    }
     try {
       setIsLoadingSignals(true);
       setSignalsLoadError(null);
@@ -169,11 +211,12 @@ export default function SignalVaultPage() {
     } finally {
       setIsLoadingSignals(false);
     }
-  }, []);
+  }, [isGuest]);
 
   useEffect(() => {
     loadSignals();
   }, [loadSignals]);
+  // loadSignals is re-created when isGuest changes, so the effect re-runs.
 
   const handleSignalPlay = (signal: Signal) => {
     setChartSymbol(pairToForexSymbol(signal.pair) ?? "EURUSD");
@@ -309,7 +352,9 @@ export default function SignalVaultPage() {
         {/* Active signals — full width card on mobile, sidebar on desktop */}
         <aside className="mt-1 flex min-h-0 flex-col rounded-2xl border border-zinc-800/90 bg-[#121212] lg:mt-0 lg:h-full lg:w-80 lg:shrink-0 lg:rounded-none lg:border-b-0 lg:border-l lg:border-t-0 lg:bg-zinc-950/50">
           <div className="lg:flex lg:h-full lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden">
-            {signalsPanel}
+            <LockedOverlay message="Log in to view live signals">
+              {signalsPanel}
+            </LockedOverlay>
           </div>
         </aside>
       </div>

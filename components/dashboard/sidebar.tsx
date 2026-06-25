@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { getAuthUserProfile } from "@/lib/auth-user";
 import { logout as performLogout } from "@/lib/logout";
 import { getPlanBalance, type SubscriptionPlan } from "@/lib/payments";
+import { useAuthState } from "@/components/auth/auth-provider";
 
 import Logo from "@/assets/icons/logos/Main-icon.svg";
 import LayoutDashboard from "@/assets/icons/dashboard-active.svg";
@@ -105,6 +106,7 @@ function initialsFromName(name: string): string {
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { isGuest, promptAuth } = useAuthState();
   const [userName, setUserName] = useState("User");
   const [userEmail, setUserEmail] = useState("Signed in");
   const [hasStoredProfile, setHasStoredProfile] = useState(false);
@@ -124,6 +126,7 @@ export function Sidebar() {
   }, []);
 
   useEffect(() => {
+    if (isGuest) return;
     const controller = new AbortController();
     void (async () => {
       try {
@@ -136,7 +139,7 @@ export function Sidebar() {
       }
     })();
     return () => controller.abort();
-  }, []);
+  }, [isGuest]);
 
   async function handleLogout() {
     setIsLoggingOut(true);
@@ -200,6 +203,29 @@ export function Sidebar() {
       </div>
 
       <div className="shrink-0 border-t border-zinc-800 p-4">
+        {isGuest ? (
+          <div className="space-y-3">
+            <p className="text-xs text-zinc-500">
+              You&apos;re browsing as a guest. Log in to unlock live signals and
+              your journal.
+            </p>
+            <button
+              type="button"
+              onClick={() => promptAuth("Create your free account")}
+              className="flex w-full items-center justify-center rounded-lg bg-white px-3 py-2 text-sm font-semibold text-black transition-colors hover:bg-zinc-200"
+            >
+              Sign up free
+            </button>
+            <button
+              type="button"
+              onClick={() => promptAuth("Welcome back")}
+              className="flex w-full items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-300 transition-colors hover:border-zinc-700 hover:bg-zinc-900 hover:text-white"
+            >
+              Log in
+            </button>
+          </div>
+        ) : (
+          <>
         <Link
           href="/dashboard/settings"
           className={cn(
@@ -227,6 +253,8 @@ export function Sidebar() {
           <LogOutIcon className="h-4 w-4 shrink-0" />
           {isLoggingOut ? "Signing out…" : "Log out"}
         </button>
+          </>
+        )}
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getAuthUserProfile } from "@/lib/auth-user";
+import { useAuthState } from "@/components/auth/auth-provider";
 import Logo from "@/assets/icons/logos/Main-icon.svg";
 
 function initialsFromName(name: string): string {
@@ -15,6 +16,7 @@ function initialsFromName(name: string): string {
 }
 
 export function MobileHeader() {
+  const { isGuest, promptAuth } = useAuthState();
   const [initials, setInitials] = useState("?");
 
   useEffect(() => {
@@ -40,12 +42,22 @@ export function MobileHeader() {
         >
           <Search className="h-5 w-5" />
         </button>
-        <div
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-700 text-xs font-medium text-white"
-          aria-hidden
-        >
-          {initials}
-        </div>
+        {isGuest ? (
+          <button
+            type="button"
+            onClick={() => promptAuth("Create your free account")}
+            className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-zinc-200"
+          >
+            Sign up
+          </button>
+        ) : (
+          <div
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-700 text-xs font-medium text-white"
+            aria-hidden
+          >
+            {initials}
+          </div>
+        )}
       </div>
     </header>
   );

@@ -1,52 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { getAuthToken } from "@/lib/cookies";
-import { API_URL } from "@/lib/config";
+import { AuthProvider, useAuthState } from "@/components/auth/auth-provider";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { MobileBottomNav } from "@/components/dashboard/mobile-bottom-nav";
 import { MobileHeader } from "@/components/dashboard/mobile-header";
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const router = useRouter();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Check auth status using token from client-side cookie
-    const checkAuth = async () => {
-      const token = getAuthToken();
-
-      if (!token) {
-        router.replace("/login");
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const res = await fetch(`${API_URL}/auth/check`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (res.ok) {
-          setIsAuthenticated(true);
-        } else {
-          router.replace("/login");
-        }
-      } catch {
-        router.replace("/login");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, [router]);
+function DashboardShell({ children }: { children: React.ReactNode }) {
+  const { isLoading } = useAuthState();
 
   if (isLoading) {
     return (
@@ -56,10 +16,8 @@ export default function DashboardLayout({
     );
   }
 
-  if (!isAuthenticated) {
-    return null;
-  }
-
+  // Render for everyone — guests browse in a gated read-only mode, the auth
+  // state drives per-feature gating downstream (LockedOverlay / requireAuth).
   return (
     <div className="flex min-h-screen bg-black text-white font-sans">
       <Sidebar />
@@ -71,5 +29,17 @@ export default function DashboardLayout({
       </div>
       <MobileBottomNav />
     </div>
+  );
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <AuthProvider>
+      <DashboardShell>{children}</DashboardShell>
+    </AuthProvider>
   );
 }

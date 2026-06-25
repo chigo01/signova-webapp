@@ -37,6 +37,7 @@ import type {
   JournalSummary,
 } from "@/components/journal/journal-types";
 import { cn } from "@/lib/utils";
+import { useAuthState } from "@/components/auth/auth-provider";
 import { AddViewMenu } from "./journal-popovers";
 import { JournalCalendar } from "./journal-calendar";
 import { JournalSwitcher } from "./journal-switcher";
@@ -57,6 +58,72 @@ type PopoverName =
   | "clock";
 
 const STARRED_KEY = "signova:starredJournalIds";
+
+/**
+ * A read-only sample journal shown to guests so they can explore the journal UI
+ * without an account. Any write action prompts login instead of mutating it.
+ */
+function buildGuestDemoJournal(): Journal {
+  const now = new Date().toISOString();
+  return {
+    _id: "guest-demo",
+    userId: "guest",
+    title: "Trading Journal (sample)",
+    isDefault: true,
+    properties: [
+      { id: "pair", name: "Pair", type: "text" },
+      {
+        id: "direction",
+        name: "Direction",
+        type: "select",
+        options: [
+          { id: "buy", label: "Buy", color: "#10C29C" },
+          { id: "sell", label: "Sell", color: "#F63B6B" },
+        ],
+      },
+      { id: "entry", name: "Entry", type: "number" },
+      {
+        id: "result",
+        name: "Result",
+        type: "select",
+        options: [
+          { id: "win", label: "Win", color: "#10C29C" },
+          { id: "loss", label: "Loss", color: "#F63B6B" },
+        ],
+      },
+      { id: "notes", name: "Notes", type: "text" },
+    ],
+    views: [{ id: "table", name: "Table", type: "table" }],
+    rows: [
+      {
+        id: "demo-row-1",
+        cells: {
+          pair: "EUR/USD",
+          direction: "Buy",
+          entry: "1.0842",
+          result: "Win",
+          notes: "Followed the plan, took partial at TP1.",
+        },
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: "demo-row-2",
+        cells: {
+          pair: "GBP/USD",
+          direction: "Sell",
+          entry: "1.2713",
+          result: "Loss",
+          notes: "Entered early, stopped out.",
+        },
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
 
 function readStarredIds(): string[] {
   if (typeof window === "undefined") return [];
@@ -260,6 +327,7 @@ function JournalTopBar({
 
 export function JournalShell({ journalId }: { journalId?: string } = {}) {
   const router = useRouter();
+  const { isGuest, promptAuth } = useAuthState();
   const [journal, setJournal] = useState<Journal | null>(null);
   const [journals, setJournals] = useState<JournalSummary[]>([]);
   const [titleDraft, setTitleDraft] = useState("");
@@ -286,17 +354,37 @@ export function JournalShell({ journalId }: { journalId?: string } = {}) {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Returns true (and prompts login) when a guest attempts a write action.
+  const guardWrite = useCallback(() => {
+    if (isGuest) {
+      promptAuth("Log in to edit your journal");
+      return true;
+    }
+    return false;
+  }, [isGuest, promptAuth]);
+
   const refreshJournals = useCallback(async () => {
+    if (isGuest) return;
     try {
       const list = await listJournals();
       setJournals(list);
     } catch {
       // Switcher list is non-critical; ignore failures silently.
     }
-  }, []);
+  }, [isGuest]);
 
   useEffect(() => {
     let cancelled = false;
+
+    // Guests get a read-only sample journal — never hit the authed API.
+    if (isGuest) {
+      setJournal(buildGuestDemoJournal());
+      setJournals([]);
+      setTitleDraft("Trading Journal (sample)");
+      setIsTableMode(true);
+      setIsLoading(false);
+      return;
+    }
 
     async function loadJournal() {
       try {
@@ -334,7 +422,7 @@ export function JournalShell({ journalId }: { journalId?: string } = {}) {
     return () => {
       cancelled = true;
     };
-  }, [journalId]);
+  }, [journalId, isGuest]);
 
   const visibleTitle = useMemo(() => {
     if (titleDraft.trim()) return titleDraft;
@@ -344,6 +432,7 @@ export function JournalShell({ journalId }: { journalId?: string } = {}) {
   const persistJournal = useCallback(
     async (payload: Parameters<typeof saveJournal>[1]) => {
       if (!journal) return;
+      if (guardWrite()) return;
       setIsSaving(true);
       setError(null);
 
@@ -364,10 +453,11 @@ export function JournalShell({ journalId }: { journalId?: string } = {}) {
         setIsSaving(false);
       }
     },
-    [journal, refreshJournals],
+    [journal, refreshJournals, guardWrite],
   );
 
   const handleCreateJournal = useCallback(async () => {
+    if (guardWrite()) return;
     setIsCreatingJournal(true);
     setError(null);
     try {
@@ -383,7 +473,7 @@ export function JournalShell({ journalId }: { journalId?: string } = {}) {
     } finally {
       setIsCreatingJournal(false);
     }
-  }, [router]);
+  }, [router, guardWrite]);
 
   const handleTitleBlur = () => {
     if (!journal || titleDraft === journal.title) return;
@@ -392,6 +482,7 @@ export function JournalShell({ journalId }: { journalId?: string } = {}) {
 
   const handleCreateTable = async () => {
     if (!journal) return;
+    if (guardWrite()) return;
     setOpenPopover(null);
     setIsTableMode(true);
 
@@ -404,6 +495,7 @@ export function JournalShell({ journalId }: { journalId?: string } = {}) {
 
   const handleAddRow = async () => {
     if (!journal) return;
+    if (guardWrite()) return;
     setIsSaving(true);
     try {
       const updated = await createJournalRow(
@@ -421,6 +513,7 @@ export function JournalShell({ journalId }: { journalId?: string } = {}) {
 
   const handleDraftCell = (rowId: string, propertyId: string, value: string) => {
     if (!journal) return;
+    if (guardWrite()) return;
 
     setJournal({
       ...journal,
@@ -434,6 +527,7 @@ export function JournalShell({ journalId }: { journalId?: string } = {}) {
 
   const handleCommitCell = async (rowId: string) => {
     if (!journal) return;
+    if (guardWrite()) return;
     const row = journal.rows.find((item) => item.id === rowId);
     if (!row) return;
 
@@ -488,6 +582,7 @@ export function JournalShell({ journalId }: { journalId?: string } = {}) {
 
   const handleDuplicateJournal = useCallback(async () => {
     if (!journal) return;
+    if (guardWrite()) return;
     setIsCreatingJournal(true);
     setError(null);
     try {
@@ -518,10 +613,11 @@ export function JournalShell({ journalId }: { journalId?: string } = {}) {
     } finally {
       setIsCreatingJournal(false);
     }
-  }, [journal, refreshJournals, router]);
+  }, [journal, refreshJournals, router, guardWrite]);
 
   const handleConfirmDelete = useCallback(async () => {
     if (!pendingDeleteId) return;
+    if (guardWrite()) return;
     setIsDeleting(true);
     setError(null);
     try {
@@ -539,11 +635,12 @@ export function JournalShell({ journalId }: { journalId?: string } = {}) {
     } finally {
       setIsDeleting(false);
     }
-  }, [pendingDeleteId, refreshJournals, router]);
+  }, [pendingDeleteId, refreshJournals, router, guardWrite]);
 
   const handleSetCell = useCallback(
     async (rowId: string, propertyId: string, value: unknown) => {
       if (!journal) return;
+      if (guardWrite()) return;
       // Optimistic update so the pill UI feels instant.
       const nextRows = journal.rows.map((row) =>
         row.id === rowId
@@ -563,12 +660,13 @@ export function JournalShell({ journalId }: { journalId?: string } = {}) {
         );
       }
     },
-    [journal],
+    [journal, guardWrite],
   );
 
   const handleGenerateAi = useCallback(
     async (rowId: string, propertyId: string) => {
       if (!journal) return;
+      if (guardWrite()) return;
       const key = `${rowId}:${propertyId}`;
       setGeneratingCells((prev) => {
         const next = new Set(prev);
@@ -594,11 +692,12 @@ export function JournalShell({ journalId }: { journalId?: string } = {}) {
         });
       }
     },
-    [journal],
+    [journal, guardWrite],
   );
 
   const handleAddProperty = async (property: JournalProperty) => {
     if (!journal) return;
+    if (guardWrite()) return;
     const properties = [...journal.properties, property];
     // Optimistic: show immediately, then persist.
     setJournal({ ...journal, properties });
@@ -607,6 +706,7 @@ export function JournalShell({ journalId }: { journalId?: string } = {}) {
 
   const handleImport = async () => {
     if (!journal) return;
+    if (guardWrite()) return;
     setIsSaving(true);
     setError(null);
 

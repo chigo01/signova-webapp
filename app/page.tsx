@@ -2,38 +2,15 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getAuthToken } from "@/lib/cookies";
-import { API_URL } from "@/lib/config";
 
 const Page = () => {
   const router = useRouter();
 
   useEffect(() => {
-    // Check auth status using token from client-side cookie
-    const checkAuth = async () => {
-      const token = getAuthToken();
-
-      if (!token) {
-        router.replace("/login");
-        return;
-      }
-
-      try {
-        const res = await fetch(`${API_URL}/auth/check`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (res.ok) {
-          router.replace("/dashboard");
-        } else {
-          router.replace("/login");
-        }
-      } catch {
-        router.replace("/login");
-      }
-    };
-
-    checkAuth();
+    // Everyone goes to the dashboard. Authenticated users see the full
+    // experience; guests see gated guest mode (the dashboard prompts login at
+    // payoff actions). No more forced bounce to /login.
+    router.replace("/dashboard");
   }, [router]);
 
   return (

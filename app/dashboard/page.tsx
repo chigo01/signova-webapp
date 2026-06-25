@@ -9,6 +9,8 @@ import { AutoJournal } from "@/components/dashboard/auto-journal";
 import { Search, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getPlanBalance, type SubscriptionPlan } from "@/lib/payments";
+import { useAuthState } from "@/components/auth/auth-provider";
+import { LockedOverlay } from "@/components/auth/locked-overlay";
 
 function formatExpiryDate(value: string | null | undefined): string {
   if (!value) return "";
@@ -22,10 +24,13 @@ function formatExpiryDate(value: string | null | undefined): string {
 }
 
 export default function DashboardPage() {
+  const { isGuest, promptAuth } = useAuthState();
   const [plan, setPlan] = useState<SubscriptionPlan | null>(null);
   const [proPlanExpiry, setProPlanExpiry] = useState<string | null>(null);
 
   useEffect(() => {
+    // Guests have no plan to load — skip the authed call to avoid 401 noise.
+    if (isGuest) return;
     const controller = new AbortController();
     void (async () => {
       try {
@@ -40,7 +45,7 @@ export default function DashboardPage() {
       }
     })();
     return () => controller.abort();
-  }, []);
+  }, [isGuest]);
 
   const expiryLabel = formatExpiryDate(proPlanExpiry);
 
@@ -88,7 +93,28 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        {plan === "free" && (
+        {isGuest && (
+          <div className="mb-5 flex flex-col gap-3 rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-4 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-300">
+                You&apos;re browsing as a guest
+              </p>
+              <p className="mt-1 text-sm text-zinc-300">
+                Create a free account to unlock live signals, the signal vault,
+                and your trading journal.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => promptAuth("Create your free account")}
+              className="inline-flex shrink-0 items-center justify-center rounded-md bg-emerald-400 px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-emerald-300 sm:self-auto"
+            >
+              Sign up free
+            </button>
+          </div>
+        )}
+
+        {!isGuest && plan === "free" && (
           <div className="mb-5 flex flex-col gap-3 rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-4 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:p-5">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wider text-emerald-300">
@@ -108,7 +134,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {(plan === "pro" || plan === "business") && expiryLabel && (
+        {!isGuest && (plan === "pro" || plan === "business") && expiryLabel && (
           <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-zinc-800 bg-[#090909] px-4 py-3 sm:mb-6">
             <span
               className={
@@ -142,10 +168,14 @@ export default function DashboardPage() {
 
         <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3 xl:gap-x-4">
           <div className="min-w-0 xl:col-span-2">
-            <SignalVaultPreview />
+            <LockedOverlay message="Log in to view live signals">
+              <SignalVaultPreview />
+            </LockedOverlay>
           </div>
           <div className="min-w-0 xl:col-span-1">
-            <AutoJournal />
+            <LockedOverlay message="Log in to find out">
+              <AutoJournal />
+            </LockedOverlay>
           </div>
         </div>
       </div>

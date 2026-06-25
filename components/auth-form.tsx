@@ -14,11 +14,17 @@ import { setAuthUserProfile } from "@/lib/auth-user";
 
 interface AuthFormProps {
   type: "login" | "register";
+  /**
+   * Called after a successful login/signup instead of the default redirect to
+   * "/". Used by the auth modal to close + refresh in place so guests stay on
+   * the page they were gated from.
+   */
+  onSuccess?: () => void;
 }
 
 const REFERRAL_CODE_STORAGE_KEY = "signova_ref_code";
 
-export function AuthForm({ type }: AuthFormProps) {
+export function AuthForm({ type, onSuccess }: AuthFormProps) {
   const [step, setStep] = React.useState<"email" | "otp">("email");
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
   const [email, setEmail] = React.useState("");
@@ -74,7 +80,11 @@ export function AuthForm({ type }: AuthFormProps) {
           isProduction ? "; secure" : ""
         }; samesite=lax`;
 
-        window.location.href = "/";
+        if (onSuccess) {
+          onSuccess();
+        } else {
+          window.location.href = "/";
+        }
       } catch (error) {
         console.error(error);
         alert("Google login failed. Please try again.");
@@ -148,8 +158,12 @@ export function AuthForm({ type }: AuthFormProps) {
         isProduction ? "; secure" : ""
       }; samesite=lax`;
 
-      // Force reload to update auth state
-      window.location.href = "/";
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        // Force reload to update auth state
+        window.location.href = "/";
+      }
     } catch (error) {
       console.error(error);
       alert("Invalid or expired OTP.");
