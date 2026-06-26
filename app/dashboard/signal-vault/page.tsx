@@ -12,7 +12,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Signal } from "@/types/signal";
-import { fetchApprovedSignals, fetchPublicSignals, playSignal } from "@/lib/signals";
+import {
+  fetchApprovedSignals,
+  fetchPublicSignals,
+  playSignal,
+} from "@/lib/signals";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { pairToForexSymbol } from "@/lib/pair-to-forex-symbol";
@@ -163,7 +167,7 @@ function VaultSignalCard({
         type="button"
         onClick={handlePlay}
         disabled={isPlaying}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-white px-3 py-3 text-xs font-semibold text-black transition-colors hover:bg-zinc-200 disabled:opacity-50"
+        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-white px-3 py-3 text-xs font-semibold text-black transition-colors hover:bg-zinc-200 disabled:opacity-50"
       >
         {isPlaying ? (
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -203,8 +207,8 @@ export default function SignalVaultPage() {
                 _id: s._id,
                 pair: s.pair,
                 direction: s.direction,
-              }) as Signal
-          )
+              }) as Signal,
+          ),
         );
       } catch (error) {
         console.error("Failed to load public signals:", error);
@@ -225,7 +229,7 @@ export default function SignalVaultPage() {
       setSignalsLoadError(
         error instanceof Error
           ? error.message
-          : "Couldn’t load signals. Try again."
+          : "Couldn’t load signals. Try again.",
       );
     } finally {
       setIsLoadingSignals(false);
@@ -283,7 +287,7 @@ export default function SignalVaultPage() {
           "space-y-4 p-4 pb-8 lg:min-h-0 lg:flex-1 lg:pb-4",
           signals.length > 0
             ? "max-h-[72vh] overflow-y-auto sm:max-h-[76vh] lg:max-h-full lg:overflow-y-auto"
-            : "min-h-[min(260px,50vh)] lg:max-h-full lg:overflow-y-auto"
+            : "min-h-[min(260px,50vh)] lg:max-h-full lg:overflow-y-auto",
         )}
       >
         {isLoadingSignals && signals.length === 0 && !signalsLoadError ? (
@@ -376,7 +380,6 @@ export default function SignalVaultPage() {
               />
             </div>
           </div>
-
         </section>
 
         {/* Active signals — full width card on mobile, sidebar on desktop */}
