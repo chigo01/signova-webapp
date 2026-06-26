@@ -10,7 +10,6 @@ import { Search, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getPlanBalance, type SubscriptionPlan } from "@/lib/payments";
 import { useAuthState } from "@/components/auth/auth-provider";
-import { LockedOverlay } from "@/components/auth/locked-overlay";
 
 function formatExpiryDate(value: string | null | undefined): string {
   if (!value) return "";
@@ -168,14 +167,10 @@ export default function DashboardPage() {
 
         <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3 xl:gap-x-4">
           <div className="min-w-0 xl:col-span-2">
-            <LockedOverlay message="Log in to view live signals">
-              <SignalVaultPreview />
-            </LockedOverlay>
+            <SignalVaultPreview />
           </div>
           <div className="min-w-0 xl:col-span-1">
-            <LockedOverlay message="Log in to find out">
-              <AutoJournal />
-            </LockedOverlay>
+            <AutoJournal />
           </div>
         </div>
       </div>
