@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, type LucideIcon } from "lucide-react";
+import { Users, HelpCircle, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAuthUserProfile } from "@/lib/auth-user";
 import { logout as performLogout } from "@/lib/logout";
@@ -203,6 +203,13 @@ export function Sidebar() {
       </div>
 
       <div className="shrink-0 border-t border-zinc-800 p-4">
+        <a
+          href="mailto:support@signova.app"
+          className="mb-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-zinc-500 transition-colors hover:bg-zinc-800/50 hover:text-white"
+        >
+          <HelpCircle className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+          support@signova.app
+        </a>
         {isGuest ? (
           <div className="space-y-3">
             <p className="text-xs text-zinc-500">

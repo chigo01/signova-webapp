@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Search, HelpCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getAuthUserProfile } from "@/lib/auth-user";
 import { useAuthState } from "@/components/auth/auth-provider";
@@ -42,6 +42,13 @@ export function MobileHeader() {
         >
           <Search className="h-5 w-5" />
         </button>
+        <a
+          href="mailto:support@signova.app"
+          className="rounded-full p-2 text-zinc-400 hover:bg-zinc-900 hover:text-white"
+          aria-label="Support"
+        >
+          <HelpCircle className="h-5 w-5" strokeWidth={1.5} />
+        </a>
         {isGuest ? (
           <button
             type="button"

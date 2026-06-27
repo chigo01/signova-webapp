@@ -3,6 +3,13 @@ import { searchPairs } from "./supported-pairs";
 const ADMIN_API_URL =
   process.env.NEXT_PUBLIC_ADMIN_API_URL || "https://admin-server-syol.onrender.com";
 
+// Live updates use a WebSocket to the admin-server's /ws/candles hub (which
+// proxies Massive's real-time stream). Polling REST /candles is kept only as an
+// automatic fallback when the socket is unavailable.
+const CANDLES_WS_URL = ADMIN_API_URL.replace(/^http/, "ws") + "/ws/candles";
+// If the socket doesn't reach "subscribed" within this window, fall back to poll.
+const WS_CONNECT_TIMEOUT_MS = 5000;
+
 const SUPPORTED_RESOLUTIONS = ["1", "5", "15", "30", "60", "240", "1D"] as const;
 
 const RESOLUTION_TO_TIMEFRAME: Record<string, string> = {
@@ -43,10 +50,39 @@ interface CandleBar {
 
 type Subscription = {
   intervalId: number;
+  ws: WebSocket | null;
+  connectTimer: number;
+  usingFallbackPoll: boolean;
+  closed: boolean;
   lastBar: CandleBar | null;
   staleTicks: number;
 };
 const subscriptions: Map<string, Subscription> = new Map();
+
+// Fully release a subscription's timers and socket. Safe to call more than once.
+function teardownSubscription(sub: Subscription) {
+  sub.closed = true;
+  if (sub.intervalId) {
+    window.clearInterval(sub.intervalId);
+    sub.intervalId = 0;
+  }
+  if (sub.connectTimer) {
+    window.clearTimeout(sub.connectTimer);
+    sub.connectTimer = 0;
+  }
+  if (sub.ws) {
+    try {
+      sub.ws.onopen = null;
+      sub.ws.onmessage = null;
+      sub.ws.onerror = null;
+      sub.ws.onclose = null;
+      sub.ws.close();
+    } catch {
+      // ignore
+    }
+    sub.ws = null;
+  }
+}
 
 interface CandlesResponse {
   status: string;
@@ -176,9 +212,66 @@ export function createDatafeed(pair: string) {
       // Tear down any prior subscription with the same guid (TradingView may
       // reuse guids across resolution changes without calling unsubscribe).
       const existing = subscriptions.get(listenerGuid);
-      if (existing) window.clearInterval(existing.intervalId);
+      if (existing) teardownSubscription(existing);
 
-      const sub: Subscription = { intervalId: 0, lastBar: null, staleTicks: 0 };
+      const sub: Subscription = {
+        intervalId: 0,
+        ws: null,
+        connectTimer: 0,
+        usingFallbackPoll: false,
+        closed: false,
+        lastBar: null,
+        staleTicks: 0,
+      };
+      subscriptions.set(listenerGuid, sub);
+
+      // Apply a candidate latest bar (from WS or poll) to the chart, handling
+      // new-bar vs same-bar-changed and the daily resetCache escalation.
+      const pushBar = (last: CandleBar) => {
+        if (subscriptions.get(listenerGuid) !== sub || sub.closed) return;
+        const prev = sub.lastBar;
+        const isNewBar = !prev || last.time > prev.time;
+        const isSameBarChanged =
+          !!prev &&
+          last.time === prev.time &&
+          (last.open !== prev.open ||
+            last.high !== prev.high ||
+            last.low !== prev.low ||
+            last.close !== prev.close ||
+            last.volume !== prev.volume);
+
+        if (!isNewBar && !isSameBarChanged) return; // nothing to push
+
+        // Fresh object every time — defensive against any reference-equality
+        // dedup inside TradingView's reconciler.
+        const tick: CandleBar = {
+          time: last.time,
+          open: last.open,
+          high: last.high,
+          low: last.low,
+          close: last.close,
+          volume: last.volume,
+        };
+        sub.lastBar = tick;
+        onTick(tick);
+
+        if (isNewBar) {
+          sub.staleTicks = 0;
+        } else {
+          sub.staleTicks += 1;
+          // TradingView silently dedupes some same-time onTick updates (esp.
+          // daily). After a few, ask the library to invalidate and refetch via
+          // getBars for a guaranteed redraw.
+          if (sub.staleTicks >= STALE_TICK_RESET_THRESHOLD) {
+            sub.staleTicks = 0;
+            try {
+              onResetCacheNeededCallback();
+            } catch {
+              // ignore — recovers on the next update
+            }
+          }
+        }
+      };
 
       const poll = async () => {
         if (typeof document !== "undefined" && document.hidden) return;
@@ -188,83 +281,90 @@ export function createDatafeed(pair: string) {
         try {
           const res = await fetch(url, { cache: "no-store" });
           if (!res.ok) return;
-          // Guard against late responses after unsubscribe.
           if (subscriptions.get(listenerGuid) !== sub) return;
           const data: CandlesResponse = await res.json();
           const last = data.bars?.[data.bars.length - 1];
-          if (!last) return;
-
-          const prev = sub.lastBar;
-          const isNewBar = !prev || last.time > prev.time;
-          const isSameBarChanged =
-            !!prev &&
-            last.time === prev.time &&
-            (last.open !== prev.open ||
-              last.high !== prev.high ||
-              last.low !== prev.low ||
-              last.close !== prev.close ||
-              last.volume !== prev.volume);
-
-          if (!isNewBar && !isSameBarChanged) return; // nothing to push
-
-          // Fresh object every time — defensive against any reference-equality
-          // dedup inside TradingView's reconciler.
-          const tick: CandleBar = {
-            time: last.time,
-            open: last.open,
-            high: last.high,
-            low: last.low,
-            close: last.close,
-            volume: last.volume,
-          };
-          sub.lastBar = tick;
-
-          if (process.env.NODE_ENV !== "production") {
-            console.debug(
-              "[tv-datafeed] onTick",
-              symbolInfo.name,
-              timeframe,
-              isNewBar ? "new-bar" : "same-bar",
-              tick
-            );
-          }
-          onTick(tick);
-
-          if (isNewBar) {
-            sub.staleTicks = 0;
-          } else {
-            sub.staleTicks += 1;
-            // Escalation: TradingView silently dedupes some same-time onTick
-            // updates (esp. daily). After a few such pushes, ask the library
-            // to invalidate its cache and re-fetch via getBars — guaranteed
-            // visible redraw.
-            if (sub.staleTicks >= STALE_TICK_RESET_THRESHOLD) {
-              sub.staleTicks = 0;
-              if (process.env.NODE_ENV !== "production") {
-                console.debug("[tv-datafeed] resetCache", symbolInfo.name, timeframe);
-              }
-              try {
-                onResetCacheNeededCallback();
-              } catch {
-                // ignore — TradingView will recover on the next poll
-              }
-            }
-          }
+          if (last) pushBar(last);
         } catch {
           // Transient network errors are silent — chart keeps its last bar.
         }
       };
 
-      sub.intervalId = window.setInterval(poll, LIVE_POLL_MS);
-      subscriptions.set(listenerGuid, sub);
-      // Kick off an immediate tick so the chart goes live without waiting.
-      poll();
+      // Fallback path: poll REST /candles (now cached server-side) when the WS
+      // is unavailable. Idempotent — only one poll loop per subscription.
+      const startFallbackPolling = () => {
+        if (sub.closed || sub.usingFallbackPoll) return;
+        sub.usingFallbackPoll = true;
+        sub.intervalId = window.setInterval(poll, LIVE_POLL_MS);
+        poll();
+      };
+
+      // Primary path: live WebSocket. Falls back to polling on any failure.
+      const connectWs = () => {
+        if (sub.closed) return;
+        let ws: WebSocket;
+        try {
+          ws = new WebSocket(CANDLES_WS_URL);
+        } catch {
+          startFallbackPolling();
+          return;
+        }
+        sub.ws = ws;
+
+        // If the socket doesn't subscribe in time, fall back without giving up
+        // the socket entirely (it may still arrive and supersede the poll).
+        sub.connectTimer = window.setTimeout(() => {
+          if (!sub.closed && !sub.usingFallbackPoll) startFallbackPolling();
+        }, WS_CONNECT_TIMEOUT_MS);
+
+        ws.onopen = () => {
+          if (sub.closed) {
+            try { ws.close(); } catch { /* noop */ }
+            return;
+          }
+          ws.send(
+            JSON.stringify({ type: "subscribe", pair: symbolInfo.name, timeframe })
+          );
+        };
+
+        ws.onmessage = (event) => {
+          if (sub.closed) return;
+          let msg: { type?: string; bar?: CandleBar; pair?: string; timeframe?: string };
+          try {
+            msg = JSON.parse(typeof event.data === "string" ? event.data : "");
+          } catch {
+            return;
+          }
+          if (msg.type === "bar" && msg.bar) {
+            // Live bar arrived: a working socket supersedes any fallback poll.
+            if (sub.usingFallbackPoll) {
+              window.clearInterval(sub.intervalId);
+              sub.intervalId = 0;
+              sub.usingFallbackPoll = false;
+            }
+            if (sub.connectTimer) {
+              window.clearTimeout(sub.connectTimer);
+              sub.connectTimer = 0;
+            }
+            pushBar(msg.bar);
+          }
+        };
+
+        const fallback = () => {
+          if (sub.ws === ws) sub.ws = null;
+          if (!sub.closed) startFallbackPolling();
+        };
+        ws.onerror = fallback;
+        ws.onclose = fallback;
+      };
+
+      connectWs();
     },
 
     unsubscribeBars(listenerGuid: string) {
       const sub = subscriptions.get(listenerGuid);
       if (sub) {
-        window.clearInterval(sub.intervalId);
+        teardownSubscription(sub);
         subscriptions.delete(listenerGuid);
       }
     },
