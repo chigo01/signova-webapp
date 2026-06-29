@@ -177,7 +177,7 @@ function VaultSignalCard({
         ) : (
           <Play className="h-4 w-4 fill-current text-black" />
         )}
-        {isPlaying ? "Playing..." : locked ? "Log in to play" : "Play Signal"}
+        {isPlaying ? "Playing..." : "Play Signal"}
       </button>
     </div>
   );
