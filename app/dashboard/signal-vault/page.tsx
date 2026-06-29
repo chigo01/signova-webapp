@@ -63,7 +63,10 @@ function VaultSignalCard({
   const handlePlay = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (locked) {
-      promptAuth("Log in to play live signals");
+      onPlay(signal);
+      setTimeout(() => {
+        promptAuth("Log in to play live signals");
+      }, 5000);
       return;
     }
     try {
@@ -90,7 +93,7 @@ function VaultSignalCard({
       <div className="flex items-center justify-between rounded-lg bg-zinc-900/80 px-3 py-2.5">
         <span className="text-xs text-zinc-400">Entry</span>
         <span className="text-xs font-mono text-white">
-          {locked ? <MaskedValue /> : signal.entryPrice}
+          {signal.entryPrice !== undefined ? signal.entryPrice : <MaskedValue />}
         </span>
       </div>
 
@@ -103,15 +106,15 @@ function VaultSignalCard({
               TP1
             </span>
           </div>
-          {locked ? (
-            <MaskedValue className="block w-full text-center text-xs font-mono text-white" />
-          ) : (
+          {signal.exitTargets?.takeProfit1 !== undefined ? (
             <span
               className="block w-full truncate text-center text-xs font-mono text-white"
               title={String(signal.exitTargets.takeProfit1)}
             >
               {formatLevelValue(signal.exitTargets.takeProfit1)}
             </span>
+          ) : (
+            <MaskedValue className="block w-full text-center text-xs font-mono text-white" />
           )}
         </div>
         <div className="flex flex-col items-center justify-center gap-[10px] rounded-[4px] border border-[#F63B6B]/30 bg-[#F63B6B]/10 p-[8px] text-center">
@@ -207,6 +210,10 @@ export default function SignalVaultPage() {
                 _id: s._id,
                 pair: s.pair,
                 direction: s.direction,
+                entryPrice: s.entryPrice,
+                exitTargets: {
+                  takeProfit1: s.takeProfit1,
+                },
               }) as Signal,
           ),
         );

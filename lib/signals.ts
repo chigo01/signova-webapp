@@ -222,6 +222,8 @@ export interface PublicSignal {
   _id: string;
   pair: string;
   direction: SignalDirection;
+  entryPrice?: number;
+  takeProfit1?: number;
 }
 
 export async function fetchPublicSignals(): Promise<PublicSignal[]> {
