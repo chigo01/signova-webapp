@@ -263,7 +263,7 @@ export default function TradingViewChart({
   ]);
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-[#1D1D1D] bg-[#121212]">
+    <div className="flex h-full w-full flex-col overflow-hidden bg-[#121212] lg:rounded-lg lg:border lg:border-[#1D1D1D]">
       {showPresetControls && (
         <div className="flex items-center gap-2 border-b border-[#1D1D1D] px-3 py-2">
           <label

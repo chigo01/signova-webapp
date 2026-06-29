@@ -367,11 +367,11 @@ export default function SignalVaultPage() {
       </div>
 
       {/* Mobile: chart first, Active Signals below; desktop: chart | sidebar */}
-      <div className="flex min-h-0 flex-col px-3 lg:h-[calc(100dvh-5.5rem)] lg:flex-row lg:overflow-hidden lg:px-0">
+      <div className="flex min-h-0 flex-col lg:h-[calc(100dvh-5.5rem)] lg:flex-row lg:overflow-hidden">
         {/* Chart column */}
         <section className="flex min-h-0 flex-col lg:h-full lg:min-h-0 lg:flex-1">
-          <div className="relative flex min-h-0 flex-1 flex-col px-2 pb-2 pt-1 lg:h-full lg:min-h-0">
-            <div className="h-[min(42vh,380px)] max-h-[420px] min-h-[280px] w-full flex-1 sm:h-[min(50vh,480px)] sm:max-h-[520px] lg:h-full lg:max-h-[760px] lg:min-h-[400px]">
+          <div className="relative flex min-h-0 flex-1 flex-col lg:h-full lg:min-h-0 lg:px-2 lg:pb-2 lg:pt-1">
+            <div className="h-[min(55vh,480px)] max-h-[500px] min-h-[300px] w-full flex-1 sm:h-[min(60vh,540px)] sm:max-h-[560px] lg:h-full lg:max-h-[760px] lg:min-h-[400px]">
               <TradingViewChart
                 symbol={chartSymbol}
                 interval="1D"
@@ -383,7 +383,7 @@ export default function SignalVaultPage() {
         </section>
 
         {/* Active signals — full width card on mobile, sidebar on desktop */}
-        <aside className="mt-1 flex min-h-0 flex-col rounded-2xl border border-zinc-800/90 bg-[#121212] lg:mt-0 lg:h-full lg:w-80 lg:shrink-0 lg:rounded-none lg:border-b-0 lg:border-l lg:border-t-0 lg:bg-zinc-950/50">
+        <aside className="flex min-h-0 flex-col border-t border-zinc-800/90 bg-[#121212] lg:h-full lg:w-80 lg:shrink-0 lg:rounded-none lg:border-b-0 lg:border-l lg:border-t-0 lg:bg-zinc-950/50">
           <div className="lg:flex lg:h-full lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden">
             {signalsPanel}
           </div>
