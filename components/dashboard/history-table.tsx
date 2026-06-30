@@ -13,6 +13,16 @@ function getOutcomeMeta(outcome?: ApprovedSignalsHistory["tradeOutcome"]) {
         label: "Take Profit Hit",
         className: "text-green-600/80",
       };
+    case "TP1_HIT":
+      return {
+        label: "TP1 Hit",
+        className: "text-green-600/80",
+      };
+    case "TP2_HIT":
+      return {
+        label: "TP2 Hit",
+        className: "text-green-600/80",
+      };
     case "SL_HIT":
       return {
         label: "Stop Loss Hit",
@@ -28,6 +38,12 @@ function getOutcomeMeta(outcome?: ApprovedSignalsHistory["tradeOutcome"]) {
         label: "Cancelled",
         className: "text-zinc-300",
       };
+    case "REVIEW_REQUIRED":
+      return {
+        label: "Under Review",
+        className: "text-amber-600/80",
+      };
+    case "PENDING":
     default:
       return {
         label: "Pending",

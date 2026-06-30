@@ -79,7 +79,15 @@ export interface Signal {
     approvedBy?: string;
     rejectionReason?: string;
   };
-  tradeOutcome?: "TP_HIT" | "SL_HIT" | "PENDING" | "BREAKEVEN" | "CANCELLED";
+  tradeOutcome?:
+    | "TP_HIT"
+    | "TP1_HIT"
+    | "TP2_HIT"
+    | "SL_HIT"
+    | "PENDING"
+    | "BREAKEVEN"
+    | "CANCELLED"
+    | "REVIEW_REQUIRED";
   engine?: {
     monitorKey?: string;
     eliteEligibility?: EliteEligibility;
@@ -98,7 +106,15 @@ export interface ApprovedSignalsHistory {
   tp2: number;
   stopLoss: number;
   playedAt: string;
-  tradeOutcome?: "TP_HIT" | "SL_HIT" | "PENDING" | "BREAKEVEN" | "CANCELLED";
+  tradeOutcome?:
+    | "TP_HIT"
+    | "TP1_HIT"
+    | "TP2_HIT"
+    | "SL_HIT"
+    | "PENDING"
+    | "BREAKEVEN"
+    | "CANCELLED"
+    | "REVIEW_REQUIRED";
   createdAt: string;
   updatedAt: string;
   __v?: number;
