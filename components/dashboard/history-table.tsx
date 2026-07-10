@@ -20,7 +20,7 @@ function getOutcomeMeta(outcome?: ApprovedSignalsHistory["tradeOutcome"]) {
       };
     case "TP2_HIT":
       return {
-        label: "TP2 Hit",
+        label: "Take Profit Hit",
         className: "text-green-600/80",
       };
     case "SL_HIT":

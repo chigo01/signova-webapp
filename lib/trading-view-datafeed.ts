@@ -57,7 +57,6 @@ type Subscription = {
   lastBar: CandleBar | null;
   staleTicks: number;
 };
-const subscriptions: Map<string, Subscription> = new Map();
 
 // Fully release a subscription's timers and socket. Safe to call more than once.
 function teardownSubscription(sub: Subscription) {
@@ -92,6 +91,13 @@ interface CandlesResponse {
 }
 
 export function createDatafeed(pair: string) {
+  // Per-widget subscription registry. TradingView listener guids are
+  // deterministic (same symbol+resolution → same guid across widget
+  // instances), and the library defers unsubscribeBars by a few seconds —
+  // so a module-level map would let an old, disposed widget's late
+  // unsubscribe tear down the replacement widget's live subscription.
+  const subscriptions: Map<string, Subscription> = new Map();
+
   return {
     onReady(callback: (config: unknown) => void) {
       setTimeout(
@@ -227,7 +233,11 @@ export function createDatafeed(pair: string) {
 
       // Apply a candidate latest bar (from WS or poll) to the chart, handling
       // new-bar vs same-bar-changed and the daily resetCache escalation.
-      const pushBar = (last: CandleBar) => {
+      // allowCacheReset must be false for WS pushes: streaming legitimately
+      // updates the same-time bar every second, and resetCache SYNCHRONOUSLY
+      // calls unsubscribeBars — escalating on stream ticks kills the live
+      // subscription within seconds of connecting.
+      const pushBar = (last: CandleBar, allowCacheReset: boolean) => {
         if (subscriptions.get(listenerGuid) !== sub || sub.closed) return;
         const prev = sub.lastBar;
         const isNewBar = !prev || last.time > prev.time;
@@ -255,7 +265,7 @@ export function createDatafeed(pair: string) {
         sub.lastBar = tick;
         onTick(tick);
 
-        if (isNewBar) {
+        if (isNewBar || !allowCacheReset) {
           sub.staleTicks = 0;
         } else {
           sub.staleTicks += 1;
@@ -284,7 +294,7 @@ export function createDatafeed(pair: string) {
           if (subscriptions.get(listenerGuid) !== sub) return;
           const data: CandlesResponse = await res.json();
           const last = data.bars?.[data.bars.length - 1];
-          if (last) pushBar(last);
+          if (last) pushBar(last, true);
         } catch {
           // Transient network errors are silent — chart keeps its last bar.
         }
@@ -346,7 +356,7 @@ export function createDatafeed(pair: string) {
               window.clearTimeout(sub.connectTimer);
               sub.connectTimer = 0;
             }
-            pushBar(msg.bar);
+            pushBar(msg.bar, false);
           }
         };
 
