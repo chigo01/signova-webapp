@@ -2,10 +2,15 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Bookmark, BookmarkCheck, Loader2, X } from "lucide-react";
 import TradingViewWidget from "@/components/signals/tradingview-widget";
 import {
   fetchStockRecommendations,
+  addPersonalWatchlistStock,
+  fetchPersonalWatchlist,
+  removePersonalWatchlistStock,
+  type StockNewsDeliveryMode,
+  type WatchlistResponse,
   type StockRecommendation,
 } from "@/lib/stocks";
 import { fetchUsStockQuote, type StockQuoteResult } from "@/lib/stock-quote";
@@ -43,6 +48,12 @@ export function StockDetailView({ symbol }: Props) {
   const [stockLoading, setStockLoading] = useState(true);
   const [quote, setQuote] = useState<StockQuoteResult | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(true);
+  const [personalWatchlist, setPersonalWatchlist] =
+    useState<WatchlistResponse | null>(null);
+  const [watchlistLoading, setWatchlistLoading] = useState(true);
+  const [watchlistSaving, setWatchlistSaving] = useState(false);
+  const [watchlistError, setWatchlistError] = useState<string | null>(null);
+  const [showAlertSetup, setShowAlertSetup] = useState(false);
   const tvSymbol = useMemo(() => usTickerToTradingViewSymbol(ticker), [ticker]);
 
   const loadStock = useCallback(async () => {
@@ -68,6 +79,24 @@ export function StockDetailView({ symbol }: Props) {
   useEffect(() => {
     void loadStock();
   }, [loadStock]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchPersonalWatchlist()
+      .then((result) => {
+        if (!cancelled) setPersonalWatchlist(result);
+      })
+      .catch((error) => {
+        console.error("Failed to load personal watchlist", error);
+        if (!cancelled) setWatchlistError("Couldn’t load your watchlist.");
+      })
+      .finally(() => {
+        if (!cancelled) setWatchlistLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!ticker) return;
@@ -107,6 +136,84 @@ export function StockDetailView({ symbol }: Props) {
         : true;
   const priceColor = isPositive ? "text-emerald-400" : "text-red-400";
   const hasLiveQuote = quote != null;
+  const isSaved = Boolean(
+    personalWatchlist?.items.some((item) => item.symbol === ticker),
+  );
+
+  const saveWithDelivery = async (delivery: StockNewsDeliveryMode) => {
+    setWatchlistSaving(true);
+    setWatchlistError(null);
+    try {
+      const timezone =
+        Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+      const result = await addPersonalWatchlistStock(ticker, {
+        delivery,
+        timezone,
+      });
+      setPersonalWatchlist(result);
+      setShowAlertSetup(false);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Couldn’t update your watchlist.";
+      setWatchlistError(message);
+      setShowAlertSetup(false);
+    } finally {
+      setWatchlistSaving(false);
+    }
+  };
+
+  const handleWatchlistClick = async () => {
+    if (watchlistSaving || watchlistLoading) return;
+    if (isSaved) {
+      setWatchlistSaving(true);
+      setWatchlistError(null);
+      try {
+        await removePersonalWatchlistStock(ticker);
+        setPersonalWatchlist((current) =>
+          current
+            ? (() => {
+                const removed = current.items.find((item) => item.symbol === ticker);
+                return {
+                ...current,
+                items: current.items.filter((item) => item.symbol !== ticker),
+                activeCount:
+                  removed?.status === "active"
+                    ? Math.max(0, current.activeCount - 1)
+                    : current.activeCount,
+                };
+              })()
+            : current,
+        );
+      } catch (error) {
+        setWatchlistError(
+          error instanceof Error ? error.message : "Couldn’t remove this stock.",
+        );
+      } finally {
+        setWatchlistSaving(false);
+      }
+      return;
+    }
+
+    if (
+      personalWatchlist?.items.length === 0 &&
+      personalWatchlist.preferences.delivery === "off"
+    ) {
+      setShowAlertSetup(true);
+      return;
+    }
+
+    setWatchlistSaving(true);
+    setWatchlistError(null);
+    try {
+      setPersonalWatchlist(await addPersonalWatchlistStock(ticker));
+    } catch (error) {
+      setWatchlistError(
+        error instanceof Error ? error.message : "Couldn’t add this stock.",
+      );
+    } finally {
+      setWatchlistSaving(false);
+    }
+  };
 
   if (!ticker) {
     return (
@@ -192,17 +299,39 @@ export function StockDetailView({ symbol }: Props) {
               )}
             </div>
 
-            {stockLoading ? (
-              <div className="grid w-full max-w-xl grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="flex w-full max-w-xl flex-col items-stretch gap-4 lg:items-end">
+              <button
+                type="button"
+                onClick={() => void handleWatchlistClick()}
+                disabled={watchlistLoading || watchlistSaving}
+                aria-pressed={isSaved}
+                className={`inline-flex h-10 items-center justify-center gap-2 rounded-md border px-4 text-sm font-medium transition-colors disabled:opacity-60 ${
+                  isSaved
+                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15"
+                    : "border-zinc-700 bg-zinc-900 text-zinc-100 hover:border-zinc-500"
+                }`}
+              >
+                {watchlistSaving || watchlistLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : isSaved ? (
+                  <BookmarkCheck className="h-4 w-4" />
+                ) : (
+                  <Bookmark className="h-4 w-4" />
+                )}
+                {isSaved ? "Saved to watchlist" : "Add to watchlist"}
+              </button>
+
+              {stockLoading ? (
+                <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div
                     key={i}
                     className="h-14 animate-pulse rounded-md bg-zinc-800/80"
                   />
                 ))}
-              </div>
-            ) : stock ? (
-              <div className="grid w-full max-w-xl grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-3">
+                </div>
+              ) : stock ? (
+                <div className="grid w-full grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-3">
                 <Stat label="Day high" value={`$${stock.high.toFixed(2)}`} />
                 <Stat label="Day low" value={`$${stock.low.toFixed(2)}`} />
                 <Stat
@@ -225,8 +354,14 @@ export function StockDetailView({ symbol }: Props) {
                         : "text-zinc-300"
                   }
                 />
-              </div>
-            ) : null}
+                </div>
+              ) : null}
+              {watchlistError && (
+                <p className="text-sm text-red-400" role="alert">
+                  {watchlistError}
+                </p>
+              )}
+            </div>
           </div>
         </header>
 
@@ -254,6 +389,64 @@ export function StockDetailView({ symbol }: Props) {
           </section>
         )}
       </div>
+
+      {showAlertSetup && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="stock-alert-setup-title"
+        >
+          <div className="w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-950 p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="stock-alert-setup-title" className="text-lg font-semibold text-white">
+                  How should we alert you about {ticker}?
+                </h2>
+                <p className="mt-1 text-sm text-zinc-400">
+                  We only email important company developments. You can change this later in Settings.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void saveWithDelivery("off")}
+                className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-white"
+                aria-label="Save without email alerts"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mt-5 space-y-2">
+              <button
+                type="button"
+                onClick={() => void saveWithDelivery("immediate")}
+                disabled={watchlistSaving}
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-left hover:border-zinc-500 disabled:opacity-60"
+              >
+                <span className="block text-sm font-medium text-white">Immediate</span>
+                <span className="mt-0.5 block text-xs text-zinc-500">Email each important story as it is discovered.</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveWithDelivery("daily")}
+                disabled={watchlistSaving}
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-left hover:border-zinc-500 disabled:opacity-60"
+              >
+                <span className="block text-sm font-medium text-white">Daily at 8:00 AM</span>
+                <span className="mt-0.5 block text-xs text-zinc-500">One combined digest in your current timezone.</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveWithDelivery("off")}
+                disabled={watchlistSaving}
+                className="w-full rounded-lg px-4 py-2 text-sm text-zinc-400 hover:bg-zinc-900 hover:text-white disabled:opacity-60"
+              >
+                Not now, save without emails
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

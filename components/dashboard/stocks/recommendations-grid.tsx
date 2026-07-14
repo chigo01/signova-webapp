@@ -149,7 +149,7 @@ export function RecommendationsGrid({
               : "text-zinc-500 hover:text-zinc-300"
           }`}
         >
-          Watchlist Signals ({watchlist.length})
+          Market Signals ({watchlist.length})
         </button>
         <button
           type="button"
@@ -204,7 +204,7 @@ export function RecommendationsGrid({
         <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-4 py-12 text-center text-sm text-zinc-500">
           {activeTab === "movers"
             ? "No market movers in the feed right now."
-            : "No watchlist signals in the feed right now."}
+            : "No market signals in the feed right now."}
         </div>
       ) : !error ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">

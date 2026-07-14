@@ -6,6 +6,12 @@ export interface NotificationPreferences {
   newsletter?: boolean;
 }
 
+export interface StockNewsPreferences {
+  delivery?: "off" | "immediate" | "daily";
+  timezone?: string;
+  changedAt?: string;
+}
+
 export interface AuthUserProfile {
   email?: string;
   name?: string;
@@ -15,6 +21,7 @@ export interface AuthUserProfile {
   avatarDataUrl?: string;
   tradeReversalEnabled?: boolean;
   notificationPreferences?: NotificationPreferences;
+  stockNewsPreferences?: StockNewsPreferences;
 }
 
 export function setAuthUserProfile(user: AuthUserProfile | null | undefined): void {
@@ -31,6 +38,7 @@ export function setAuthUserProfile(user: AuthUserProfile | null | undefined): vo
         avatarDataUrl: user.avatarDataUrl,
         tradeReversalEnabled: user.tradeReversalEnabled,
         notificationPreferences: user.notificationPreferences,
+        stockNewsPreferences: user.stockNewsPreferences,
       })
     );
   } catch {
@@ -54,6 +62,7 @@ export function getAuthUserProfile(): AuthUserProfile | null {
       avatarDataUrl,
       tradeReversalEnabled,
       notificationPreferences,
+      stockNewsPreferences,
     } = parsed as AuthUserProfile;
     return {
       ...(typeof email === "string" ? { email } : {}),
@@ -68,6 +77,9 @@ export function getAuthUserProfile(): AuthUserProfile | null {
       ...(notificationPreferences &&
       typeof notificationPreferences === "object"
         ? { notificationPreferences }
+        : {}),
+      ...(stockNewsPreferences && typeof stockNewsPreferences === "object"
+        ? { stockNewsPreferences }
         : {}),
     };
   } catch {

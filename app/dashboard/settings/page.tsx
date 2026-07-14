@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   AuthUserProfile,
   NotificationPreferences,
+  StockNewsPreferences,
   getAuthUserProfile,
   setAuthUserProfile,
 } from "@/lib/auth-user";
@@ -13,7 +14,6 @@ import { API_URL } from "@/lib/config";
 import { getAuthHeaders } from "@/lib/cookies";
 import { PROFILE_ROLES } from "@/lib/profile";
 import { EditProfileModal } from "@/components/dashboard/edit-profile-modal";
-import { getPlanBalance, type SubscriptionPlan } from "@/lib/payments";
 
 // Mirrors the backend default for tradeReversalEnabled (user.model.ts).
 const TRADE_REVERSAL_DEFAULT = true;
@@ -69,7 +69,11 @@ export default function UserSettingsPage() {
   const [notificationError, setNotificationError] = useState<string | null>(
     null
   );
-  const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan>("free");
+  const [stockNewsPrefs, setStockNewsPrefs] = useState<Required<Pick<StockNewsPreferences, "delivery" | "timezone">>>({
+    delivery: "off",
+    timezone: "UTC",
+  });
+  const [stockNewsSaving, setStockNewsSaving] = useState(false);
   const isMounted = useRef(true);
 
   useEffect(() => {
@@ -91,6 +95,12 @@ export default function UserSettingsPage() {
           normalizeNotificationPrefs(cached.notificationPreferences)
         );
       }
+      if (cached.stockNewsPreferences) {
+        setStockNewsPrefs({
+          delivery: cached.stockNewsPreferences.delivery ?? "off",
+          timezone: cached.stockNewsPreferences.timezone ?? "UTC",
+        });
+      }
     }
 
     let cancelled = false;
@@ -111,6 +121,7 @@ export default function UserSettingsPage() {
           avatarDataUrl: data.user.avatarDataUrl,
           tradeReversalEnabled: data.user.tradeReversalEnabled,
           notificationPreferences: data.user.notificationPreferences,
+          stockNewsPreferences: data.user.stockNewsPreferences,
         };
 
         setProfile((prev) => ({ ...prev, ...merged }));
@@ -122,6 +133,12 @@ export default function UserSettingsPage() {
             normalizeNotificationPrefs(merged.notificationPreferences)
           );
         }
+        if (merged.stockNewsPreferences) {
+          setStockNewsPrefs({
+            delivery: merged.stockNewsPreferences.delivery ?? "off",
+            timezone: merged.stockNewsPreferences.timezone ?? "UTC",
+          });
+        }
         setAuthUserProfile(merged);
       } catch (err) {
         console.error("Failed to load profile", err);
@@ -131,21 +148,6 @@ export default function UserSettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void (async () => {
-      try {
-        const balance = await getPlanBalance({ signal: controller.signal });
-        if (!controller.signal.aborted) setCurrentPlan(balance.plan);
-      } catch (err) {
-        if ((err as Error).name !== "AbortError") {
-          console.error("Failed to load plan balance", err);
-        }
-      }
-    })();
-    return () => controller.abort();
   }, []);
 
   async function handleLogout() {
@@ -226,6 +228,42 @@ export default function UserSettingsPage() {
         setNotificationPrefs((prev) => ({ ...prev, [key]: !next }));
         setNotificationError("Couldn't save that change. Please try again.");
       }
+    }
+  }
+
+  async function updateStockNewsPreferences(
+    patch: Partial<Pick<StockNewsPreferences, "delivery" | "timezone">>,
+  ) {
+    const previous = stockNewsPrefs;
+    const next = { ...stockNewsPrefs, ...patch };
+    setStockNewsPrefs(next);
+    setStockNewsSaving(true);
+    setNotificationError(null);
+    try {
+      const res = await fetch(`${API_URL}/auth/profile`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ stockNewsPreferences: patch }),
+      });
+      if (!res.ok) throw new Error("Failed to update stock news preference");
+      const data = await res.json();
+      if (data?.user) {
+        setProfile((current) => ({ ...current, ...data.user }));
+        setAuthUserProfile(data.user);
+        setStockNewsPrefs({
+          delivery: data.user.stockNewsPreferences?.delivery ?? "off",
+          timezone: data.user.stockNewsPreferences?.timezone ?? "UTC",
+        });
+      }
+    } catch (error) {
+      console.error(error);
+      setStockNewsPrefs(previous);
+      setNotificationError("Couldn’t save that change. Please try again.");
+    } finally {
+      setStockNewsSaving(false);
     }
   }
 
@@ -399,6 +437,64 @@ export default function UserSettingsPage() {
                 </div>
               );
             })}
+            <div className="rounded-md border border-zinc-800 bg-black/50 px-3 py-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-zinc-200">Stock watchlist news</p>
+                  <p className="mt-0.5 text-xs text-zinc-500">
+                    Important company news only. No trading advice.
+                  </p>
+                </div>
+                <select
+                  value={stockNewsPrefs.delivery}
+                  disabled={stockNewsSaving}
+                  onChange={(event) =>
+                    void updateStockNewsPreferences({
+                      delivery: event.target.value as "off" | "immediate" | "daily",
+                      ...(event.target.value === "daily" && stockNewsPrefs.timezone === "UTC"
+                        ? {
+                            timezone:
+                              Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+                          }
+                        : {}),
+                    })
+                  }
+                  aria-label="Stock watchlist news delivery"
+                  className="h-9 rounded-md border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-100 outline-none focus:border-zinc-500 disabled:opacity-60"
+                >
+                  <option value="off">Off</option>
+                  <option value="immediate">Immediate</option>
+                  <option value="daily">Daily digest</option>
+                </select>
+              </div>
+              {stockNewsPrefs.delivery === "daily" && (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800 pt-3">
+                  <p className="text-xs text-zinc-500">
+                    Sent at 8:00 AM in {stockNewsPrefs.timezone}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={stockNewsSaving}
+                    onClick={() =>
+                      void updateStockNewsPreferences({
+                        timezone:
+                          Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+                      })
+                    }
+                    className="text-xs font-medium text-zinc-300 hover:text-white disabled:opacity-60"
+                  >
+                    Use current timezone
+                  </button>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => router.push("/dashboard/stocks")}
+                className="mt-3 text-xs font-medium text-blue-400 hover:underline"
+              >
+                Manage my watchlist
+              </button>
+            </div>
           </div>
           {notificationError && (
             <p className="mt-2 text-xs text-red-400">{notificationError}</p>

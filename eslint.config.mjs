@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored TradingView distribution files are generated, multi-megabyte
+    // bundles. Linting them can exhaust Node's heap and cannot produce
+    // actionable source feedback.
+    "public/charting_library/**",
+    "public/datafeeds/**",
   ]),
 ]);
 

@@ -43,6 +43,106 @@ export interface TopNewsResponse {
   lastUpdated: string;
 }
 
+export type StockNewsDeliveryMode = "off" | "immediate" | "daily";
+
+export interface WatchlistItem {
+  symbol: string;
+  companyName?: string;
+  status: "active" | "plan_paused";
+  alertsActiveSince: string;
+  addedAt: string;
+}
+
+export interface WatchlistResponse {
+  items: WatchlistItem[];
+  effectivePlan: "free" | "pro";
+  limit: number | null;
+  activeCount: number;
+  preferences: {
+    delivery: StockNewsDeliveryMode;
+    timezone: string;
+    changedAt: string;
+  };
+}
+
+export class WatchlistApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
+
+async function watchlistRequest(
+  path: string,
+  init: RequestInit = {},
+): Promise<WatchlistResponse> {
+  const token = getAuthToken();
+  const res = await fetch(`${API_URL}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...init.headers,
+    },
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as {
+      message?: string;
+      code?: string;
+    };
+    throw new WatchlistApiError(
+      body.message || `Watchlist request failed (${res.status})`,
+      res.status,
+      body.code,
+    );
+  }
+  return res.json();
+}
+
+export function fetchPersonalWatchlist(): Promise<WatchlistResponse> {
+  return watchlistRequest("/stocks/watchlist");
+}
+
+export function addPersonalWatchlistStock(
+  symbol: string,
+  preferences?: { delivery: StockNewsDeliveryMode; timezone: string },
+): Promise<WatchlistResponse> {
+  return watchlistRequest("/stocks/watchlist", {
+    method: "POST",
+    body: JSON.stringify({ symbol, ...preferences }),
+  });
+}
+
+export async function removePersonalWatchlistStock(
+  symbol: string,
+): Promise<void> {
+  const token = getAuthToken();
+  const res = await fetch(
+    `${API_URL}/stocks/watchlist/${encodeURIComponent(symbol)}`,
+    {
+      method: "DELETE",
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    },
+  );
+  if (!res.ok && res.status !== 404) {
+    throw new WatchlistApiError("Could not remove stock", res.status);
+  }
+}
+
+export function setActivePersonalWatchlistStocks(
+  symbols: string[],
+): Promise<WatchlistResponse> {
+  return watchlistRequest("/stocks/watchlist/active", {
+    method: "PUT",
+    body: JSON.stringify({ symbols }),
+  });
+}
+
 /**
  * In-memory stale-while-revalidate cache for the stocks page.
  *

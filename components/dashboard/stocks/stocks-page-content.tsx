@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { HeatMap } from "@/components/dashboard/stocks/heat-map";
 import { TopNewsList } from "@/components/dashboard/stocks/top-news-list";
 import { TopGainers } from "@/components/dashboard/stocks/top-gainers";
 import { RecommendationsGrid } from "@/components/dashboard/stocks/recommendations-grid";
+import { PersonalWatchlist } from "@/components/dashboard/stocks/personal-watchlist";
 import {
   fetchStockRecommendations,
   fetchTopNews,
@@ -110,14 +110,17 @@ export function StocksPageContent() {
   }, []);
 
   useEffect(() => {
-    const cache = getStocksCache();
-    const hasCache = cache.recommendations !== null && cache.news !== null;
-    if (!hasCache) {
-      void load(); // first load — show spinner, full fetch
-    } else if (isStocksCacheStale()) {
-      void load({ background: true }); // stale-while-revalidate, no spinner
-    }
-    // fresh cache → render as-is, skip the fetch
+    const timer = window.setTimeout(() => {
+      const cache = getStocksCache();
+      const hasCache = cache.recommendations !== null && cache.news !== null;
+      if (!hasCache) {
+        void load(); // first load — show spinner, full fetch
+      } else if (isStocksCacheStale()) {
+        void load({ background: true }); // stale-while-revalidate, no spinner
+      }
+      // fresh cache → render as-is, skip the fetch
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const openTickerFromSearch = useCallback(() => {
@@ -153,6 +156,8 @@ export function StocksPageContent() {
           </div>
         </div>
       </div>
+
+      <PersonalWatchlist />
 
       <section className="mb-8">
         <div className="mb-4 flex items-center justify-between">
