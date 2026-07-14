@@ -56,11 +56,14 @@ type Subscription = {
   closed: boolean;
   lastBar: CandleBar | null;
   staleTicks: number;
+  removeResumeListeners: (() => void) | null;
 };
 
 // Fully release a subscription's timers and socket. Safe to call more than once.
 function teardownSubscription(sub: Subscription) {
   sub.closed = true;
+  sub.removeResumeListeners?.();
+  sub.removeResumeListeners = null;
   if (sub.intervalId) {
     window.clearInterval(sub.intervalId);
     sub.intervalId = 0;
@@ -228,6 +231,7 @@ export function createDatafeed(pair: string) {
         closed: false,
         lastBar: null,
         staleTicks: 0,
+        removeResumeListeners: null,
       };
       subscriptions.set(listenerGuid, sub);
 
@@ -361,7 +365,10 @@ export function createDatafeed(pair: string) {
         };
 
         const fallback = () => {
-          if (sub.ws === ws) sub.ws = null;
+          // Ignore close/error events from a socket that has already been
+          // replaced by a newer connection.
+          if (sub.ws !== ws) return;
+          sub.ws = null;
           if (!sub.closed) startFallbackPolling();
         };
         ws.onerror = fallback;
@@ -369,6 +376,56 @@ export function createDatafeed(pair: string) {
       };
 
       connectWs();
+
+      // Background tabs can leave a browser WebSocket looking OPEN even after
+      // the underlying connection has been suspended or dropped. In that
+      // state neither onclose nor onerror fires, so the fallback poll never
+      // starts and the chart remains frozen after the user returns.
+      //
+      // Always catch up from REST and replace the socket when the document is
+      // resumed. `pageshow` also covers back-forward-cache restores, while
+      // `online` covers a network change that did not produce a socket event.
+      const resumeLiveUpdates = () => {
+        if (sub.closed || document.hidden) return;
+
+        void poll();
+
+        if (sub.connectTimer) {
+          window.clearTimeout(sub.connectTimer);
+          sub.connectTimer = 0;
+        }
+
+        const staleWs = sub.ws;
+        if (staleWs) {
+          // Detach first so closing this socket cannot start the fallback for
+          // the replacement connection through its old event handlers.
+          staleWs.onopen = null;
+          staleWs.onmessage = null;
+          staleWs.onerror = null;
+          staleWs.onclose = null;
+          sub.ws = null;
+          try {
+            staleWs.close();
+          } catch {
+            // ignore; the replacement connection below is authoritative
+          }
+        }
+
+        connectWs();
+      };
+
+      const onVisibilityChange = () => {
+        if (!document.hidden) resumeLiveUpdates();
+      };
+
+      document.addEventListener("visibilitychange", onVisibilityChange);
+      window.addEventListener("pageshow", resumeLiveUpdates);
+      window.addEventListener("online", resumeLiveUpdates);
+      sub.removeResumeListeners = () => {
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+        window.removeEventListener("pageshow", resumeLiveUpdates);
+        window.removeEventListener("online", resumeLiveUpdates);
+      };
     },
 
     unsubscribeBars(listenerGuid: string) {
