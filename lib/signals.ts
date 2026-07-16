@@ -214,16 +214,30 @@ export async function fetchApprovedSignals(): Promise<Signal[]> {
 }
 
 /**
- * Guest-facing signals: the public endpoint returns only the pair and
- * direction (no entry/TP/SL), so logged-out users can see what pairs are
- * active without the real numbers ever reaching the browser. No auth header.
+ * Guest-facing signals: the public endpoint returns a limited subset used by
+ * locked cards, including release time, entry, and TP1. Stop loss, TP2,
+ * indicators, reasoning, and other protected details stay server-side.
  */
 export interface PublicSignal {
   _id: string;
   pair: string;
   direction: SignalDirection;
+  timestamp?: string;
   entryPrice?: number;
   takeProfit1?: number;
+}
+
+export function toLockedSignal(signal: PublicSignal): Signal {
+  return {
+    _id: signal._id,
+    pair: signal.pair,
+    direction: signal.direction,
+    timestamp: signal.timestamp ?? "",
+    entryPrice: signal.entryPrice,
+    exitTargets: {
+      takeProfit1: signal.takeProfit1,
+    },
+  } as Signal;
 }
 
 export async function fetchPublicSignals(): Promise<PublicSignal[]> {

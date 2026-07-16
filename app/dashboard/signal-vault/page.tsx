@@ -16,12 +16,14 @@ import {
   fetchApprovedSignals,
   fetchPublicSignals,
   playSignal,
+  toLockedSignal,
 } from "@/lib/signals";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { pairToForexSymbol } from "@/lib/pair-to-forex-symbol";
 import TradingViewChart from "@/components/charts/trading-view-chart";
 import { useAuthState } from "@/components/auth/auth-provider";
+import { TradeReleaseInfo } from "@/components/dashboard/trade-release-info";
 
 function formatLevelValue(value: number): string {
   // Keep signal levels compact so they never overflow the TP/SL boxes.
@@ -84,9 +86,12 @@ function VaultSignalCard({
     <div className="flex flex-col gap-[14px] rounded-[8px] border border-[#1D1D1D] bg-[#121212] px-[13px] py-[14px]">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-bold text-white">{signal.pair}</h3>
-        <span className={`text-xs font-bold ${directionColor}`}>
-          {signal.direction}
-        </span>
+        <div className="flex items-center gap-1">
+          <span className={`text-xs font-bold ${directionColor}`}>
+            {signal.direction}
+          </span>
+          <TradeReleaseInfo releasedAt={signal.timestamp} />
+        </div>
       </div>
 
       {/* Entry Price */}
@@ -204,18 +209,7 @@ export default function SignalVaultPage() {
         setSignalsLoadError(null);
         const data = await fetchPublicSignals();
         setSignals(
-          data.map(
-            (s) =>
-              ({
-                _id: s._id,
-                pair: s.pair,
-                direction: s.direction,
-                entryPrice: s.entryPrice,
-                exitTargets: {
-                  takeProfit1: s.takeProfit1,
-                },
-              }) as Signal,
-          ),
+          data.map(toLockedSignal),
         );
       } catch (error) {
         console.error("Failed to load public signals:", error);
