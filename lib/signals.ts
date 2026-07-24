@@ -150,10 +150,14 @@ function normalizeSignal(signal: ApiSignal): Signal | null {
       rawSignal.supportResistance ??
       legacySignal.supportResistance ??
       fallbackSupportResistance,
+    // exitTargets is the source of truth for the bracket everywhere else —
+    // engine normalization, the TP/SL monitors, charts and emails all read it.
+    // Older stored docs can carry a riskAssessment computed independently, so
+    // take exitTargets first rather than falling back to it.
     riskAssessment: {
       ...riskAssessment,
-      stopLoss: riskAssessment.stopLoss ?? exitTargets.stopLoss,
-      takeProfit: riskAssessment.takeProfit ?? exitTargets.takeProfit1,
+      stopLoss: exitTargets.stopLoss ?? riskAssessment.stopLoss,
+      takeProfit: exitTargets.takeProfit1 ?? riskAssessment.takeProfit,
       riskRewardRatio: riskAssessment.riskRewardRatio ?? 0,
     },
     reasoning: sanitizeReasoning(
