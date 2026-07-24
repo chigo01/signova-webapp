@@ -87,13 +87,13 @@ export function TradeReleaseInfo({ releasedAt }: TradeReleaseInfoProps) {
           <div className="flex items-center gap-2 text-zinc-300">
             <Clock3 className="h-4 w-4 text-emerald-400" aria-hidden="true" />
             <p className="text-xs font-semibold uppercase tracking-wide">
-              Time since release
+              Time since approved
             </p>
           </div>
 
           {elapsed === null ? (
             <p className="mt-3 text-sm font-medium text-zinc-300">
-              Release time unavailable
+              Approval time unavailable
             </p>
           ) : (
             <>
@@ -104,7 +104,7 @@ export function TradeReleaseInfo({ releasedAt }: TradeReleaseInfoProps) {
                 {elapsed}
               </p>
               <p className="mt-1 text-[11px] text-zinc-500">
-                Released {releasedAtLabel}
+                Approved {releasedAtLabel}
               </p>
             </>
           )}

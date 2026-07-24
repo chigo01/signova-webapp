@@ -83,7 +83,7 @@ describe("TradeReleaseInfo", () => {
     expect(screen.getByText("01:02:04")).toBeInTheDocument();
 
     fireEvent.click(trigger);
-    expect(screen.queryByText("Time since release")).not.toBeInTheDocument();
+    expect(screen.queryByText("Time since approved")).not.toBeInTheDocument();
     expect(clearIntervalSpy).toHaveBeenCalled();
   });
 
@@ -95,7 +95,7 @@ describe("TradeReleaseInfo", () => {
       }),
     );
 
-    expect(screen.getByText("Release time unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Approval time unavailable")).toBeInTheDocument();
     expect(
       screen.getByText(/Confirm the current market price before entering/),
     ).toBeInTheDocument();
@@ -125,7 +125,7 @@ describe("TradeReleaseInfo", () => {
     fireEvent.keyDown(document, { key: "Escape" });
 
     await waitFor(() => {
-      expect(screen.queryByText("Time since release")).not.toBeInTheDocument();
+      expect(screen.queryByText("Time since approved")).not.toBeInTheDocument();
       expect(trigger).toHaveFocus();
     });
   });
@@ -141,7 +141,7 @@ describe("TradeReleaseInfo", () => {
       name: "View trade release information",
     });
     fireEvent.click(trigger);
-    expect(screen.getByText("Time since release")).toBeInTheDocument();
+    expect(screen.getByText("Time since approved")).toBeInTheDocument();
 
     const outside = screen.getByRole("button", { name: "Outside" });
     await act(async () => {});
@@ -155,7 +155,7 @@ describe("TradeReleaseInfo", () => {
     fireEvent.click(outside);
 
     await waitFor(() => {
-      expect(screen.queryByText("Time since release")).not.toBeInTheDocument();
+      expect(screen.queryByText("Time since approved")).not.toBeInTheDocument();
     });
   });
 });
