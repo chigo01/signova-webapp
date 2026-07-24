@@ -5,25 +5,30 @@ import { AlertTriangle, Clock3, Info } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 export interface TradeReleaseInfoProps {
-  releasedAt: string;
+  /**
+   * Moment an admin approved the signal — NOT the moment the engine generated
+   * it. The countdown answers "how stale is this trade for me", which starts
+   * when the trade was released to users, not when the analysis ran.
+   */
+  approvedAt: string;
 }
 
-function parseReleasedAt(releasedAt: string): number | null {
-  if (!releasedAt.trim()) return null;
-  const releasedAtMs = new Date(releasedAt).getTime();
-  return Number.isNaN(releasedAtMs) ? null : releasedAtMs;
+function parseApprovedAt(approvedAt: string): number | null {
+  if (!approvedAt.trim()) return null;
+  const approvedAtMs = new Date(approvedAt).getTime();
+  return Number.isNaN(approvedAtMs) ? null : approvedAtMs;
 }
 
 export function formatElapsedDuration(
-  releasedAt: string,
+  approvedAt: string,
   nowMs: number = Date.now(),
 ): string | null {
-  const releasedAtMs = parseReleasedAt(releasedAt);
-  if (releasedAtMs === null) return null;
+  const approvedAtMs = parseApprovedAt(approvedAt);
+  if (approvedAtMs === null) return null;
 
   const totalSeconds = Math.max(
     0,
-    Math.floor((nowMs - releasedAtMs) / 1_000),
+    Math.floor((nowMs - approvedAtMs) / 1_000),
   );
   const days = Math.floor(totalSeconds / 86_400);
   const hours = Math.floor((totalSeconds % 86_400) / 3_600);
@@ -36,10 +41,10 @@ export function formatElapsedDuration(
   return days > 0 ? `${days}d ${clock}` : clock;
 }
 
-export function TradeReleaseInfo({ releasedAt }: TradeReleaseInfoProps) {
+export function TradeReleaseInfo({ approvedAt }: TradeReleaseInfoProps) {
   const [open, setOpen] = useState(false);
   const [nowMs, setNowMs] = useState<number | null>(null);
-  const releasedAtMs = useMemo(() => parseReleasedAt(releasedAt), [releasedAt]);
+  const approvedAtMs = useMemo(() => parseApprovedAt(approvedAt), [approvedAt]);
 
   useEffect(() => {
     if (!open) return;
@@ -54,14 +59,14 @@ export function TradeReleaseInfo({ releasedAt }: TradeReleaseInfoProps) {
   };
 
   const elapsed =
-    nowMs === null ? null : formatElapsedDuration(releasedAt, nowMs);
-  const releasedAtLabel =
-    releasedAtMs === null
+    nowMs === null ? null : formatElapsedDuration(approvedAt, nowMs);
+  const approvedAtLabel =
+    approvedAtMs === null
       ? null
       : new Intl.DateTimeFormat(undefined, {
           dateStyle: "medium",
           timeStyle: "medium",
-        }).format(releasedAtMs);
+        }).format(approvedAtMs);
 
   return (
     <Popover.Root open={open} onOpenChange={handleOpenChange}>
@@ -104,7 +109,7 @@ export function TradeReleaseInfo({ releasedAt }: TradeReleaseInfoProps) {
                 {elapsed}
               </p>
               <p className="mt-1 text-[11px] text-zinc-500">
-                Approved {releasedAtLabel}
+                Approved {approvedAtLabel}
               </p>
             </>
           )}

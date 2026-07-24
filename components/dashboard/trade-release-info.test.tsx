@@ -39,20 +39,20 @@ describe("formatElapsedDuration", () => {
     ["2026-07-16T11:59:01.000Z", "00:00:59"],
     ["2026-07-16T10:57:57.000Z", "01:02:03"],
     ["2026-07-14T08:55:54.000Z", "2d 03:04:06"],
-  ])("formats %s as %s", (releasedAt, expected) => {
-    expect(formatElapsedDuration(releasedAt, NOW)).toBe(expected);
+  ])("formats %s as %s", (approvedAt, expected) => {
+    expect(formatElapsedDuration(approvedAt, NOW)).toBe(expected);
   });
 
-  it("clamps future release times to zero", () => {
+  it("clamps future approval times to zero", () => {
     expect(formatElapsedDuration("2026-07-16T13:00:00.000Z", NOW)).toBe(
       "00:00:00",
     );
   });
 
   it.each(["", "not-a-date"])(
-    "returns null for an unavailable release time: %s",
-    (releasedAt) => {
-      expect(formatElapsedDuration(releasedAt, NOW)).toBeNull();
+    "returns null for an unavailable approval time: %s",
+    (approvedAt) => {
+      expect(formatElapsedDuration(approvedAt, NOW)).toBeNull();
     },
   );
 });
@@ -62,7 +62,7 @@ describe("TradeReleaseInfo", () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     const clearIntervalSpy = vi.spyOn(window, "clearInterval");
-    render(<TradeReleaseInfo releasedAt="2026-07-16T10:57:57.000Z" />);
+    render(<TradeReleaseInfo approvedAt="2026-07-16T10:57:57.000Z" />);
 
     const trigger = screen.getByRole("button", {
       name: "View trade release information",
@@ -87,8 +87,8 @@ describe("TradeReleaseInfo", () => {
     expect(clearIntervalSpy).toHaveBeenCalled();
   });
 
-  it("shows a safe fallback when the release time is unavailable", () => {
-    render(<TradeReleaseInfo releasedAt="" />);
+  it("shows a safe fallback when the approval time is unavailable", () => {
+    render(<TradeReleaseInfo approvedAt="" />);
     fireEvent.click(
       screen.getByRole("button", {
         name: "View trade release information",
@@ -102,7 +102,7 @@ describe("TradeReleaseInfo", () => {
   });
 
   it("opens from a keyboard-generated trigger click", () => {
-    render(<TradeReleaseInfo releasedAt="2026-07-16T10:57:57.000Z" />);
+    render(<TradeReleaseInfo approvedAt="2026-07-16T10:57:57.000Z" />);
     const trigger = screen.getByRole("button", {
       name: "View trade release information",
     });
@@ -115,7 +115,7 @@ describe("TradeReleaseInfo", () => {
   });
 
   it("closes on Escape and restores focus to the trigger", async () => {
-    render(<TradeReleaseInfo releasedAt="2026-07-16T10:57:57.000Z" />);
+    render(<TradeReleaseInfo approvedAt="2026-07-16T10:57:57.000Z" />);
     const trigger = screen.getByRole("button", {
       name: "View trade release information",
     });
@@ -133,7 +133,7 @@ describe("TradeReleaseInfo", () => {
   it("closes when the user interacts outside the popover", async () => {
     render(
       <>
-        <TradeReleaseInfo releasedAt="2026-07-16T10:57:57.000Z" />
+        <TradeReleaseInfo approvedAt="2026-07-16T10:57:57.000Z" />
         <button type="button">Outside</button>
       </>,
     );

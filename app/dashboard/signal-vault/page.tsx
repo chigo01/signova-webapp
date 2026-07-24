@@ -90,7 +90,8 @@ function VaultSignalCard({
           <span className={`text-xs font-bold ${directionColor}`}>
             {signal.direction}
           </span>
-          <TradeReleaseInfo releasedAt={signal.timestamp} />
+          {/* Approval time, not the engine's analysis timestamp — see Signal.approvedAt. */}
+          <TradeReleaseInfo approvedAt={signal.approvedAt ?? signal.timestamp} />
         </div>
       </div>
 

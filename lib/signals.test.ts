@@ -8,6 +8,7 @@ describe("toLockedSignal", () => {
       pair: "EUR/USD",
       direction: "BUY",
       timestamp: "2026-07-16T10:00:00.000Z",
+      approvedAt: "2026-07-16T14:30:00.000Z",
       entryPrice: 1.2345,
       takeProfit1: 1.24,
     });
@@ -17,6 +18,7 @@ describe("toLockedSignal", () => {
       pair: "EUR/USD",
       direction: "BUY",
       timestamp: "2026-07-16T10:00:00.000Z",
+      approvedAt: "2026-07-16T14:30:00.000Z",
       entryPrice: 1.2345,
       exitTargets: { takeProfit1: 1.24 },
     });
@@ -30,5 +32,16 @@ describe("toLockedSignal", () => {
         direction: "BUY",
       }).timestamp,
     ).toBe("");
+  });
+
+  it("leaves approvedAt undefined when the public response omits it", () => {
+    expect(
+      toLockedSignal({
+        _id: "signal-1",
+        pair: "EUR/USD",
+        direction: "BUY",
+        timestamp: "2026-07-16T10:00:00.000Z",
+      }).approvedAt,
+    ).toBeUndefined();
   });
 });

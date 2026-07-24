@@ -69,7 +69,14 @@ export interface Signal {
   supportResistance: ISupportResistance;
   riskAssessment: IRiskMetrics;
   reasoning: string[];
+  /** When the engine generated the signal — not when an admin released it. */
   timestamp: string; // Date comes as string from JSON
+  /**
+   * When an admin approved the signal (mirrors screenshot.approvedAt). This is
+   * what the "time since approved" countdown runs off; `timestamp` is only the
+   * analysis time and can be hours earlier.
+   */
+  approvedAt?: string;
   screenshot?: {
     url: string;
     publicId: string;

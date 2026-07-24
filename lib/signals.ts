@@ -122,6 +122,14 @@ function normalizeSignal(signal: ApiSignal): Signal | null {
     return null;
   }
 
+  const approvedAt =
+    signal.approvedAt ??
+    signal.screenshot?.approvedAt ??
+    rawSignal.approvedAt ??
+    rawSignal.screenshot?.approvedAt ??
+    legacySignal.approvedAt ??
+    legacySignal.screenshot?.approvedAt;
+
   const riskAssessment = {
     positionSize: 0,
     maxDrawdown: 0,
@@ -169,6 +177,10 @@ function normalizeSignal(signal: ApiSignal): Signal | null {
       legacySignal.timestamp ??
       monitorSignal.timestamp ??
       "",
+    // Approval time is stored on the screenshot sub-document by admin-server
+    // (both the engine-candidate and Top5Refined paths). Fall back to the
+    // analysis timestamp only for older docs approved before it was recorded.
+    approvedAt: approvedAt ?? undefined,
     screenshot: signal.screenshot ?? rawSignal.screenshot ?? legacySignal.screenshot,
     tradeOutcome:
       signal.tradeOutcome ?? rawSignal.tradeOutcome ?? legacySignal.tradeOutcome,
@@ -219,7 +231,7 @@ export async function fetchApprovedSignals(): Promise<Signal[]> {
 
 /**
  * Guest-facing signals: the public endpoint returns a limited subset used by
- * locked cards, including release time, entry, and TP1. Stop loss, TP2,
+ * locked cards, including approval time, entry, and TP1. Stop loss, TP2,
  * indicators, reasoning, and other protected details stay server-side.
  */
 export interface PublicSignal {
@@ -227,6 +239,7 @@ export interface PublicSignal {
   pair: string;
   direction: SignalDirection;
   timestamp?: string;
+  approvedAt?: string;
   entryPrice?: number;
   takeProfit1?: number;
 }
@@ -237,6 +250,7 @@ export function toLockedSignal(signal: PublicSignal): Signal {
     pair: signal.pair,
     direction: signal.direction,
     timestamp: signal.timestamp ?? "",
+    approvedAt: signal.approvedAt,
     entryPrice: signal.entryPrice,
     exitTargets: {
       takeProfit1: signal.takeProfit1,
