@@ -56,6 +56,12 @@ describe("StockDetailView personal watchlist", () => {
         timezone: "UTC",
         changedAt: new Date().toISOString(),
       },
+      deliveryHealth: {
+        availability: "scheduled",
+        lastRunStatus: "completed",
+        lastRunAt: new Date().toISOString(),
+        lastSentAt: null,
+      },
     });
     stocksMocks.addPersonalWatchlistStock.mockResolvedValue({
       items: [
@@ -73,6 +79,12 @@ describe("StockDetailView personal watchlist", () => {
         delivery: "immediate",
         timezone: "UTC",
         changedAt: new Date().toISOString(),
+      },
+      deliveryHealth: {
+        availability: "scheduled",
+        lastRunStatus: "completed",
+        lastRunAt: new Date().toISOString(),
+        lastSentAt: null,
       },
     });
   });

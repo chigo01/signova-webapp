@@ -404,7 +404,7 @@ export function StockDetailView({ symbol }: Props) {
                   How should we alert you about {ticker}?
                 </h2>
                 <p className="mt-1 text-sm text-zinc-400">
-                  We only email important company developments. You can change this later in Settings.
+                  We email only when important company developments are found. You can change this later in Settings.
                 </p>
               </div>
               <button
@@ -432,8 +432,8 @@ export function StockDetailView({ symbol }: Props) {
                 disabled={watchlistSaving}
                 className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-left hover:border-zinc-500 disabled:opacity-60"
               >
-                <span className="block text-sm font-medium text-white">Daily at 8:00 AM</span>
-                <span className="mt-0.5 block text-xs text-zinc-500">One combined digest in your current timezone.</span>
+                <span className="block text-sm font-medium text-white">Important-news digest after 8:00 AM</span>
+                <span className="mt-0.5 block text-xs text-zinc-500">One combined digest on news days, in your current timezone.</span>
               </button>
               <button
                 type="button"

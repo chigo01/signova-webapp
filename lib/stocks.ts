@@ -63,6 +63,12 @@ export interface WatchlistResponse {
     timezone: string;
     changedAt: string;
   };
+  deliveryHealth: {
+    availability: "scheduled" | "disabled" | "misconfigured";
+    lastRunStatus: "completed" | "failed" | null;
+    lastRunAt: string | null;
+    lastSentAt: string | null;
+  };
 }
 
 export class WatchlistApiError extends Error {

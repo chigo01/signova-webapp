@@ -16,7 +16,6 @@ import {
   Rows3,
   Sparkles,
   Table2,
-  Text,
   Trash2,
   Type,
   WrapText,
@@ -147,35 +146,40 @@ type AiSuggestion = {
 
 const AI_SUGGESTIONS: AiSuggestion[] = [
   { kind: "summary", label: "AI summary", defaultName: "AI summary" },
-  { kind: "key-info", label: "AI key info", defaultName: "AI key info" },
-  {
-    kind: "custom",
-    label: "AI custom autofill",
-    defaultName: "AI custom autofill",
-  },
-  {
-    kind: "translation",
-    label: "AI translation",
-    defaultName: "AI translation",
-  },
 ];
 
-type BasicType = {
-  type: "text" | "number" | "select" | "multi-select";
-  label: string;
-  icon: typeof Text;
-  defaultName: string;
-};
-
-const BASIC_TYPES: BasicType[] = [
-  { type: "text", label: "Text", icon: Text, defaultName: "Text" },
-  { type: "number", label: "Number", icon: Hash, defaultName: "Number" },
-  { type: "select", label: "Select", icon: Eye, defaultName: "Select" },
+const RISK_PROPERTIES: Array<{
+  id: string;
+  name: string;
+  keywords: string;
+}> = [
+  { id: "entryPrice", name: "Entry price", keywords: "entry open price" },
+  { id: "exitPrice", name: "Exit price", keywords: "exit close price" },
   {
-    type: "multi-select",
-    label: "Multi-select",
-    icon: Rows3,
-    defaultName: "Multi-select",
+    id: "positionSize",
+    name: "Position size",
+    keywords: "position size quantity lots",
+  },
+  { id: "stopLoss", name: "Stop loss", keywords: "stop loss sl risk" },
+  {
+    id: "targetPrice",
+    name: "Take profit",
+    keywords: "take profit target tp",
+  },
+  {
+    id: "riskRewardRatio",
+    name: "Risk-to-reward ratio",
+    keywords: "risk reward ratio rr r:r",
+  },
+  {
+    id: "accountSize",
+    name: "Account size",
+    keywords: "account balance equity size",
+  },
+  {
+    id: "riskPerTrade",
+    name: "Risk per trade (%)",
+    keywords: "risk per trade percent percentage",
   },
 ];
 
@@ -197,20 +201,10 @@ export function NewPropertyMenu({
   onAddProperty: (property: JournalProperty) => void;
   onClose: () => void;
 }) {
-  const [stage, setStage] = useState<
-    | { kind: "root" }
-    | { kind: "custom"; name: string; prompt: string }
-    | {
-        kind: "translation";
-        name: string;
-        sourcePropertyId: string;
-        targetLanguage: string;
-      }
-  >({ kind: "root" });
   const [filter, setFilter] = useState("");
 
   const addSimple = (
-    type: BasicType["type"] | "ai",
+    type: "number" | "ai",
     overrides: Partial<JournalProperty>,
   ) => {
     const name = overrides.name?.trim() || "Untitled";
@@ -226,181 +220,35 @@ export function NewPropertyMenu({
   };
 
   const handleAiClick = (suggestion: AiSuggestion) => {
-    if (suggestion.kind === "custom") {
-      setStage({
-        kind: "custom",
-        name: suggestion.defaultName,
-        prompt: "",
-      });
-      return;
-    }
-    if (suggestion.kind === "translation") {
-      const firstTextish = existingProperties.find(
-        (p) => p.type === "text" || p.type === "ai",
-      );
-      setStage({
-        kind: "translation",
-        name: suggestion.defaultName,
-        sourcePropertyId: firstTextish?.id ?? "",
-        targetLanguage: "Spanish",
-      });
-      return;
-    }
-    // summary / key-info → save immediately with defaults.
     addSimple("ai", {
       name: suggestion.defaultName,
-      ai: { kind: suggestion.kind, sourcePropertyIds: [] },
+      ai: {
+        kind: suggestion.kind,
+        sourcePropertyIds: [],
+        model: "gpt-5.4-mini",
+      },
     });
   };
-
-  if (stage.kind === "custom") {
-    return (
-      <div className="absolute right-0 top-10 z-40 w-72 rounded-lg border border-zinc-800 bg-[#171717] p-3 shadow-2xl shadow-black/60">
-        <div className="mb-3 flex items-center gap-2">
-          <button
-            type="button"
-            aria-label="Back"
-            onClick={() => setStage({ kind: "root" })}
-            className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-white"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <p className="text-xs font-semibold text-zinc-300">
-            AI custom autofill
-          </p>
-        </div>
-        <label className="mb-1 block text-[11px] font-medium text-zinc-500">
-          Column name
-        </label>
-        <input
-          value={stage.name}
-          onChange={(event) =>
-            setStage({ ...stage, name: event.target.value })
-          }
-          className="mb-3 h-8 w-full rounded border border-zinc-800 bg-[#202020] px-2 text-xs text-zinc-200 outline-none focus:border-zinc-500"
-        />
-        <label className="mb-1 block text-[11px] font-medium text-zinc-500">
-          Prompt
-        </label>
-        <textarea
-          value={stage.prompt}
-          onChange={(event) =>
-            setStage({ ...stage, prompt: event.target.value })
-          }
-          placeholder="e.g. Suggest a stop-loss strategy for this trade."
-          rows={4}
-          className="mb-3 w-full rounded border border-zinc-800 bg-[#202020] p-2 text-xs text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-zinc-500"
-        />
-        <button
-          type="button"
-          disabled={!stage.name.trim() || !stage.prompt.trim()}
-          onClick={() =>
-            addSimple("ai", {
-              name: stage.name,
-              ai: { kind: "custom", prompt: stage.prompt, sourcePropertyIds: [] },
-            })
-          }
-          className="w-full rounded bg-white px-3 py-1.5 text-xs font-semibold text-black hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Add column
-        </button>
-      </div>
-    );
-  }
-
-  if (stage.kind === "translation") {
-    const eligibleSources = existingProperties.filter(
-      (p) => p.type !== "multi-select" && p.type !== "date",
-    );
-    return (
-      <div className="absolute right-0 top-10 z-40 w-72 rounded-lg border border-zinc-800 bg-[#171717] p-3 shadow-2xl shadow-black/60">
-        <div className="mb-3 flex items-center gap-2">
-          <button
-            type="button"
-            aria-label="Back"
-            onClick={() => setStage({ kind: "root" })}
-            className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-white"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <p className="text-xs font-semibold text-zinc-300">AI translation</p>
-        </div>
-        <label className="mb-1 block text-[11px] font-medium text-zinc-500">
-          Column name
-        </label>
-        <input
-          value={stage.name}
-          onChange={(event) =>
-            setStage({ ...stage, name: event.target.value })
-          }
-          className="mb-3 h-8 w-full rounded border border-zinc-800 bg-[#202020] px-2 text-xs text-zinc-200 outline-none focus:border-zinc-500"
-        />
-        <label className="mb-1 block text-[11px] font-medium text-zinc-500">
-          Source column
-        </label>
-        <select
-          value={stage.sourcePropertyId}
-          onChange={(event) =>
-            setStage({ ...stage, sourcePropertyId: event.target.value })
-          }
-          className="mb-3 h-8 w-full rounded border border-zinc-800 bg-[#202020] px-2 text-xs text-zinc-200 outline-none focus:border-zinc-500"
-        >
-          {eligibleSources.length === 0 ? (
-            <option value="">No eligible columns</option>
-          ) : (
-            eligibleSources.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))
-          )}
-        </select>
-        <label className="mb-1 block text-[11px] font-medium text-zinc-500">
-          Target language
-        </label>
-        <input
-          value={stage.targetLanguage}
-          onChange={(event) =>
-            setStage({ ...stage, targetLanguage: event.target.value })
-          }
-          placeholder="e.g. Spanish, French, Japanese"
-          className="mb-3 h-8 w-full rounded border border-zinc-800 bg-[#202020] px-2 text-xs text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-zinc-500"
-        />
-        <button
-          type="button"
-          disabled={
-            !stage.name.trim() ||
-            !stage.sourcePropertyId ||
-            !stage.targetLanguage.trim()
-          }
-          onClick={() =>
-            addSimple("ai", {
-              name: stage.name,
-              ai: {
-                kind: "translation",
-                sourcePropertyIds: [stage.sourcePropertyId],
-                targetLanguage: stage.targetLanguage,
-              },
-            })
-          }
-          className="w-full rounded bg-white px-3 py-1.5 text-xs font-semibold text-black hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Add column
-        </button>
-      </div>
-    );
-  }
 
   const lowered = filter.trim().toLowerCase();
   const aiMatches = lowered
     ? AI_SUGGESTIONS.filter((s) => s.label.toLowerCase().includes(lowered))
     : AI_SUGGESTIONS;
-  const typeMatches = lowered
-    ? BASIC_TYPES.filter((t) => t.label.toLowerCase().includes(lowered))
-    : BASIC_TYPES;
+  const existingIds = new Set(existingProperties.map((property) => property.id));
+  const existingNames = new Set(
+    existingProperties.map((property) => property.name.trim().toLowerCase()),
+  );
+  const riskMatches = RISK_PROPERTIES.filter(
+    (property) =>
+      !existingIds.has(property.id) &&
+      !existingNames.has(property.name.toLowerCase()) &&
+      (!lowered ||
+        property.name.toLowerCase().includes(lowered) ||
+        property.keywords.includes(lowered)),
+  );
 
   return (
-    <div className="absolute right-0 top-10 z-40 w-60 rounded-lg border border-zinc-800 bg-[#171717] p-3 shadow-2xl shadow-black/60">
+    <div className="absolute right-0 top-10 z-40 max-h-[70vh] w-60 overflow-y-auto rounded-lg border border-zinc-800 bg-[#171717] p-3 shadow-2xl shadow-black/60">
       <p className="mb-3 text-xs font-semibold text-zinc-300">
         New property on Trading Journal
       </p>
@@ -427,25 +275,26 @@ export function NewPropertyMenu({
           ))}
         </>
       ) : null}
-      {typeMatches.length > 0 ? (
+      {riskMatches.length > 0 ? (
         <>
-          <p className="mb-1 mt-3 text-xs font-medium text-zinc-500">Type</p>
-          {typeMatches.map((basic) => (
+          <p className="mb-1 mt-3 text-xs font-medium text-zinc-500">
+            Risk management
+          </p>
+          {riskMatches.map((property) => (
             <button
-              key={basic.label}
+              key={property.id}
               type="button"
               onClick={() =>
-                addSimple(basic.type, {
-                  name: basic.defaultName,
-                  ...(basic.type === "select" || basic.type === "multi-select"
-                    ? { options: [] }
-                    : {}),
+                addSimple("number", {
+                  id: property.id,
+                  name: property.name,
+                  width: 150,
                 })
               }
               className={menuItemClass}
             >
-              <basic.icon className="h-4 w-4 text-zinc-500" />
-              {basic.label}
+              <Hash className="h-4 w-4 text-zinc-500" />
+              {property.name}
             </button>
           ))}
         </>

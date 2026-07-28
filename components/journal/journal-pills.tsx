@@ -20,15 +20,10 @@ interface AnchorRect {
 /** Track an element's viewport rect and update on scroll/resize. */
 function useAnchorRect(
   ref: React.RefObject<HTMLElement | null>,
-  active: boolean,
 ): AnchorRect | null {
   const [rect, setRect] = useState<AnchorRect | null>(null);
 
   useLayoutEffect(() => {
-    if (!active) {
-      setRect(null);
-      return;
-    }
     function update() {
       const el = ref.current;
       if (!el) return;
@@ -48,7 +43,7 @@ function useAnchorRect(
       window.removeEventListener("scroll", update, true);
       window.removeEventListener("resize", update);
     };
-  }, [ref, active]);
+  }, [ref]);
 
   return rect;
 }
@@ -129,7 +124,7 @@ function PillDropdown({
   const [filter, setFilter] = useState("");
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const anchorRect = useAnchorRect(anchorRef, true);
+  const anchorRect = useAnchorRect(anchorRef);
 
   useEffect(() => {
     inputRef.current?.focus();

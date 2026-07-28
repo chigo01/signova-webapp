@@ -11,6 +11,58 @@ import {
 } from "@/lib/stocks";
 import { getAuthToken } from "@/lib/cookies";
 
+function formatDeliveryTime(value: string, timeZone: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    timeZone,
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+export function WatchlistDeliveryHealth({ data }: { data: WatchlistResponse }) {
+  if (data.preferences.delivery === "off") return null;
+
+  const unavailable =
+    data.deliveryHealth.availability !== "scheduled" ||
+    data.deliveryHealth.lastRunStatus === "failed";
+  if (unavailable) {
+    return (
+      <div
+        className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
+        role="alert"
+      >
+        News alerts are temporarily unavailable. Your watchlist is saved.{" "}
+        <Link
+          href="/dashboard/settings"
+          className="font-medium text-amber-100 underline underline-offset-2"
+        >
+          Review alert settings
+        </Link>{" "}
+        or check again later.
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
+      <span>
+        {data.deliveryHealth.lastRunAt
+          ? `Last checked ${formatDeliveryTime(data.deliveryHealth.lastRunAt, data.preferences.timezone)}`
+          : "Alerts scheduled. First check pending."}
+      </span>
+      {data.deliveryHealth.lastSentAt && (
+        <span>
+          Last email sent{" "}
+          {formatDeliveryTime(
+            data.deliveryHealth.lastSentAt,
+            data.preferences.timezone,
+          )}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function PersonalWatchlist() {
   const [data, setData] = useState<WatchlistResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -98,13 +150,15 @@ export function PersonalWatchlist() {
         {data && (
           <span className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-400">
             {data.preferences.delivery === "daily"
-              ? `Daily at 8 AM · ${data.preferences.timezone}`
+              ? `Important-news digest · after 8 AM · ${data.preferences.timezone}`
               : data.preferences.delivery === "immediate"
                 ? "Immediate news alerts"
                 : "News emails off"}
           </span>
         )}
       </div>
+
+      {data && <WatchlistDeliveryHealth data={data} />}
 
       {loading ? (
         <div className="flex h-20 items-center justify-center text-zinc-500">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { JournalProperty } from "./journal-types";
@@ -18,6 +18,12 @@ export interface FilterEntry {
 /** Visible (non-hidden) properties — toolbars only reason about those. */
 function visible(properties: JournalProperty[]) {
   return properties.filter((p) => !p.hidden);
+}
+
+function nextFilterId(filters: FilterEntry[]): string {
+  let index = filters.length + 1;
+  while (filters.some((filter) => filter.id === `f-${index}`)) index += 1;
+  return `f-${index}`;
 }
 
 /** Close-on-outside-click for any popover that takes a ref. */
@@ -154,7 +160,7 @@ export function FilterPopover({
     onChange([
       ...filters,
       {
-        id: `f-${Date.now().toString(36)}`,
+        id: nextFilterId(filters),
         propertyId: first.id,
         value: "",
       },

@@ -442,7 +442,7 @@ export default function UserSettingsPage() {
                 <div>
                   <p className="text-sm text-zinc-200">Stock watchlist news</p>
                   <p className="mt-0.5 text-xs text-zinc-500">
-                    Important company news only. No trading advice.
+                    Emails only when important company news is found. No trading advice.
                   </p>
                 </div>
                 <select
@@ -464,13 +464,13 @@ export default function UserSettingsPage() {
                 >
                   <option value="off">Off</option>
                   <option value="immediate">Immediate</option>
-                  <option value="daily">Daily digest</option>
+                  <option value="daily">Important-news digest</option>
                 </select>
               </div>
               {stockNewsPrefs.delivery === "daily" && (
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800 pt-3">
                   <p className="text-xs text-zinc-500">
-                    Sent at 8:00 AM in {stockNewsPrefs.timezone}
+                    Sent after 8:00 AM in {stockNewsPrefs.timezone}, on news days only
                   </p>
                   <button
                     type="button"

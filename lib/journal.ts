@@ -227,7 +227,40 @@ export interface GenerateAiCellResponse {
   journal: Journal;
   value: string;
   model: string;
+  historyRows?: number;
   usage: { tokensIn: number; tokensOut: number };
+}
+
+export async function generateAiSummaryCell(
+  journalId: string,
+  rowId: string,
+  propertyId: string,
+): Promise<GenerateAiCellResponse> {
+  const res = await fetch("/dashboard/journal/api/ai-summary", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ journalId, rowId, propertyId }),
+  });
+
+  if (!res.ok) {
+    let errorMsg = `AI summary failed: ${res.status}`;
+    try {
+      const errorJson = await res.json();
+      if (errorJson?.message) errorMsg = errorJson.message;
+    } catch {
+      // body wasn't JSON
+    }
+    throw new Error(errorMsg);
+  }
+
+  const data = (await res.json()) as GenerateAiCellResponse;
+  if (!data.success || !data.journal || typeof data.value !== "string") {
+    throw new Error("Invalid AI summary response");
+  }
+  return data;
 }
 
 export async function generateAiCell(

@@ -25,6 +25,7 @@ import {
   fetchDefaultJournal,
   fetchJournal,
   generateAiCell,
+  generateAiSummaryCell,
   importSignalPlays,
   listJournals,
   saveJournal,
@@ -33,7 +34,6 @@ import {
 import type {
   Journal,
   JournalProperty,
-  JournalRow,
   JournalSummary,
 } from "@/components/journal/journal-types";
 import { cn } from "@/lib/utils";
@@ -81,7 +81,18 @@ function buildGuestDemoJournal(): Journal {
           { id: "sell", label: "Sell", color: "#F63B6B" },
         ],
       },
-      { id: "entry", name: "Entry", type: "number" },
+      { id: "entryPrice", name: "Entry price", type: "number" },
+      { id: "exitPrice", name: "Exit price", type: "number" },
+      { id: "positionSize", name: "Position size", type: "number" },
+      { id: "stopLoss", name: "Stop loss", type: "number" },
+      { id: "targetPrice", name: "Take profit", type: "number" },
+      {
+        id: "riskRewardRatio",
+        name: "Risk-to-reward ratio",
+        type: "number",
+      },
+      { id: "accountSize", name: "Account size", type: "number" },
+      { id: "riskPerTrade", name: "Risk per trade (%)", type: "number" },
       {
         id: "result",
         name: "Result",
@@ -100,7 +111,14 @@ function buildGuestDemoJournal(): Journal {
         cells: {
           pair: "EUR/USD",
           direction: "Buy",
-          entry: "1.0842",
+          entryPrice: "1.0842",
+          exitPrice: "1.0915",
+          positionSize: "0.5",
+          stopLoss: "1.0800",
+          targetPrice: "1.0920",
+          riskRewardRatio: "1.74",
+          accountSize: "10000",
+          riskPerTrade: "1",
           result: "Win",
           notes: "Followed the plan, took partial at TP1.",
         },
@@ -112,7 +130,14 @@ function buildGuestDemoJournal(): Journal {
         cells: {
           pair: "GBP/USD",
           direction: "Sell",
-          entry: "1.2713",
+          entryPrice: "1.2713",
+          exitPrice: "1.2760",
+          positionSize: "0.3",
+          stopLoss: "1.2760",
+          targetPrice: "1.2630",
+          riskRewardRatio: "1.77",
+          accountSize: "10000",
+          riskPerTrade: "1",
           result: "Loss",
           notes: "Entered early, stopped out.",
         },
@@ -675,9 +700,19 @@ export function JournalShell({ journalId }: { journalId?: string } = {}) {
       });
       setError(null);
       try {
-        const result = await generateAiCell(journal._id, rowId, propertyId);
+        const property = journal.properties.find(
+          (candidate) => candidate.id === propertyId,
+        );
+        const result =
+          property?.type === "ai" && property.ai?.kind === "summary"
+            ? await generateAiSummaryCell(journal._id, rowId, propertyId)
+            : await generateAiCell(journal._id, rowId, propertyId);
         setJournal(result.journal);
-        setStatus("AI cell generated");
+        setStatus(
+          result.historyRows === undefined
+            ? "AI cell generated"
+            : `AI summary generated from ${result.historyRows} historical ${result.historyRows === 1 ? "trade" : "trades"}`,
+        );
       } catch (generateError) {
         setError(
           generateError instanceof Error

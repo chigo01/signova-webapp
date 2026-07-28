@@ -543,17 +543,28 @@ export function JournalTable({
                             Generating…
                           </span>
                         ) : valueToText(rawValue) ? (
-                          <div className="flex w-full items-center gap-2">
-                            <span className="line-clamp-2 flex-1 whitespace-pre-line text-xs text-zinc-300">
-                              {valueToText(rawValue)}
-                            </span>
+                          <div className="flex w-full items-start gap-1.5 py-1">
+                            {property.ai?.kind === "summary" ? (
+                              <textarea
+                                aria-label={`${property.name} value`}
+                                readOnly
+                                rows={3}
+                                spellCheck={false}
+                                value={valueToText(rawValue)}
+                                className="min-h-[4.75rem] max-h-64 flex-1 resize-y overflow-y-auto rounded-md border border-zinc-800 bg-[#141414] px-2.5 py-2 text-xs leading-5 text-zinc-200 outline-none transition-colors hover:border-zinc-700 focus:border-zinc-600 focus:bg-[#181818]"
+                              />
+                            ) : (
+                              <span className="line-clamp-2 flex-1 whitespace-pre-line text-xs text-zinc-300">
+                                {valueToText(rawValue)}
+                              </span>
+                            )}
                             <button
                               type="button"
                               aria-label="Regenerate"
                               onClick={() =>
                                 onGenerateAi(row.id, property.id)
                               }
-                              className="hidden h-6 w-6 place-items-center rounded text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 group-hover/cell:grid"
+                              className="grid h-7 w-7 shrink-0 place-items-center rounded text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
                             >
                               <RefreshCw className="h-3 w-3" />
                             </button>
