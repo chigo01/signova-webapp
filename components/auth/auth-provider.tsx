@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { getAuthToken } from "@/lib/cookies";
+import { getAuthToken, removeAuthToken } from "@/lib/cookies";
 import { API_URL } from "@/lib/config";
 import { AuthModal } from "@/components/auth/auth-modal";
 
@@ -35,8 +35,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     let cancelled = false;
+    let retryTimer: number | undefined;
+    let activeRequest: AbortController | undefined;
 
-    const checkAuth = async () => {
+    function scheduleRetry() {
+      if (cancelled || retryTimer !== undefined) return;
+      retryTimer = window.setTimeout(() => {
+        retryTimer = undefined;
+        void checkAuth();
+      }, 5_000);
+    }
+
+    async function checkAuth() {
       const token = getAuthToken();
 
       if (!token) {
@@ -47,21 +57,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      activeRequest?.abort();
+      const controller = new AbortController();
+      activeRequest = controller;
+
       try {
         const res = await fetch(`${API_URL}/auth/check`, {
           headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
         });
-        if (!cancelled) setIsAuthenticated(res.ok);
+
+        if (cancelled || controller.signal.aborted) return;
+
+        if (res.ok) {
+          setIsAuthenticated(true);
+        } else if (res.status === 401) {
+          removeAuthToken();
+          setIsAuthenticated(false);
+        } else {
+          // The token is still present and the server did not reject it. Keep
+          // the local session while a temporary API/database failure recovers.
+          setIsAuthenticated(true);
+          scheduleRetry();
+        }
       } catch {
-        if (!cancelled) setIsAuthenticated(false);
+        if (cancelled || controller.signal.aborted) return;
+
+        // Network and CORS failures say nothing about JWT validity. Preserve
+        // the session and retry instead of turning the user into a guest.
+        setIsAuthenticated(true);
+        scheduleRetry();
       } finally {
         if (!cancelled) setIsLoading(false);
       }
+    }
+
+    const retryNow = () => {
+      if (retryTimer !== undefined) {
+        window.clearTimeout(retryTimer);
+        retryTimer = undefined;
+      }
+      void checkAuth();
+    };
+
+    const retryWhenVisible = () => {
+      if (document.visibilityState === "visible") retryNow();
     };
 
     void checkAuth();
+    window.addEventListener("online", retryNow);
+    document.addEventListener("visibilitychange", retryWhenVisible);
     return () => {
       cancelled = true;
+      activeRequest?.abort();
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+      window.removeEventListener("online", retryNow);
+      document.removeEventListener("visibilitychange", retryWhenVisible);
     };
   }, []);
 
