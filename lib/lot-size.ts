@@ -124,10 +124,15 @@ export type QuoteRateSource =
   | "quote-is-usd"
   /** USD-based pair: the entry price is the USD/quote rate, so 1/entry converts. */
   | "derived-from-entry"
-  /** Cross pair, rate supplied by the user. */
+  /** Cross pair, rate fetched live from the price feed. */
+  | "live"
+  /** Cross pair, rate typed by the user after the live lookup failed. */
   | "manual"
-  /** Cross pair with no rate supplied — treated as 1 and warned about. */
+  /** Cross pair with no rate available — treated as 1 and warned about. */
   | "assumed";
+
+/** Where a caller-supplied cross rate came from. */
+export type QuoteRateOrigin = "live" | "manual";
 
 export interface LotSizeTarget {
   label: string;
@@ -149,7 +154,9 @@ export interface LotSizeInput {
   takeProfit1?: number;
   takeProfit2?: number;
   /** USD per 1 unit of the quote currency. Cross pairs only. */
-  manualQuoteRate?: number;
+  quoteRateOverride?: number;
+  /** Labels where quoteRateOverride came from. Defaults to "manual". */
+  quoteRateOrigin?: QuoteRateOrigin;
 }
 
 export interface LotSizeResult {
@@ -207,7 +214,8 @@ function floorToLotStep(lots: number): number {
 function resolveQuoteRate(
   instrument: InstrumentSpec,
   entryPrice: number,
-  manualQuoteRate: number | undefined,
+  quoteRateOverride: number | undefined,
+  quoteRateOrigin: QuoteRateOrigin,
 ): { rate: number; source: QuoteRateSource } {
   if (instrument.quote === "USD") return { rate: 1, source: "quote-is-usd" };
 
@@ -217,11 +225,16 @@ function resolveQuoteRate(
     return { rate: 1 / entryPrice, source: "derived-from-entry" };
   }
 
-  if (manualQuoteRate !== undefined && Number.isFinite(manualQuoteRate) && manualQuoteRate > 0) {
-    return { rate: manualQuoteRate, source: "manual" };
+  if (
+    quoteRateOverride !== undefined &&
+    Number.isFinite(quoteRateOverride) &&
+    quoteRateOverride > 0
+  ) {
+    return { rate: quoteRateOverride, source: quoteRateOrigin };
   }
 
-  // A cross like EUR/JPY needs the USD/JPY leg, which isn't in the signal.
+  // A cross like EUR/JPY needs the USD/JPY leg, which isn't in the signal. The
+  // caller fetches it (lib/quote-rate.ts); this is the it-didn't-arrive path.
   return { rate: 1, source: "assumed" };
 }
 
@@ -243,7 +256,8 @@ export function calculateLotSize(input: LotSizeInput): LotSizeResult {
     direction,
     takeProfit1,
     takeProfit2,
-    manualQuoteRate,
+    quoteRateOverride,
+    quoteRateOrigin = "manual",
   } = input;
 
   if (!Number.isFinite(accountBalance) || accountBalance <= 0) {
@@ -271,12 +285,13 @@ export function calculateLotSize(input: LotSizeInput): LotSizeResult {
   const { rate: quoteRate, source: quoteRateSource } = resolveQuoteRate(
     instrument,
     entryPrice,
-    manualQuoteRate,
+    quoteRateOverride,
+    quoteRateOrigin,
   );
 
   if (quoteRateSource === "assumed") {
     warnings.push(
-      `${instrument.label} is a cross pair. Enter the USD value of 1 ${instrument.quote} — until then the result is unconverted and will be wrong.`,
+      `${instrument.label} is a cross pair and the live ${instrument.quote} rate couldn't be loaded. Enter the USD value of 1 ${instrument.quote} — until then the result is unconverted and will be wrong.`,
     );
   }
   if (riskPercent > HIGH_RISK_PERCENT) {

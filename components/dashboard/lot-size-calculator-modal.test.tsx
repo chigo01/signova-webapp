@@ -1,7 +1,35 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LotSizeCalculatorModal } from "./lot-size-calculator-modal";
+import { resetQuoteRateCache } from "@/lib/quote-rate";
 import { Signal } from "@/types/signal";
+
+/**
+ * Stand in for the /candles endpoint the cross-rate lookup reads. `closes` maps
+ * a 6-letter symbol to its latest close; anything absent answers noData, which
+ * is how the real endpoint reports a pair it can't price.
+ */
+function stubCandles(closes: Record<string, number>) {
+  const fetchMock = vi.fn(async (url: string) => {
+    const symbol = new URL(url, "http://localhost").searchParams.get("pair")!;
+    const close = closes[symbol];
+    return {
+      ok: true,
+      json: async () =>
+        close === undefined
+          ? { bars: [], noData: true }
+          : { bars: [{ close }], noData: false },
+    } as Response;
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
 
 // Node 22 exposes its own experimental `localStorage` global, which shadows
 // jsdom's and is inert without --localstorage-file. Stub a working in-memory
@@ -18,6 +46,10 @@ beforeEach(() => {
       return store.size;
     },
   });
+  // Rates are cached per currency at module scope; clear so each test's stub
+  // is actually consulted.
+  resetQuoteRateCache();
+  stubCandles({});
 });
 
 afterEach(() => {
@@ -93,7 +125,8 @@ describe("LotSizeCalculatorModal", () => {
     expect(screen.getByText("0.83")).toBeInTheDocument();
   });
 
-  it("asks for a conversion rate once a cross pair is selected", () => {
+  it("fetches the conversion rate itself once a cross pair is selected", async () => {
+    stubCandles({ JPYUSD: 0.0063694 });
     render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
 
     expect(screen.queryByLabelText(/USD per 1/)).not.toBeInTheDocument();
@@ -103,6 +136,87 @@ describe("LotSizeCalculatorModal", () => {
     });
 
     expect(screen.getByLabelText("USD per 1 JPY")).toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(field("USD per 1 JPY").value).toBe("0.0063694"),
+    );
+    expect(screen.getByText(/Live rate/)).toBeInTheDocument();
+    // The rate arrived, so nothing is left unconverted.
+    expect(screen.queryByText(/cross pair/)).not.toBeInTheDocument();
+  });
+
+  it("falls back to the inverse leg when the direct one has no data", async () => {
+    stubCandles({ USDJPY: 157 });
+    render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText("Instrument"), {
+      target: { value: "EURJPY" },
+    });
+
+    // 1 / 157 = 0.00636943, to six significant figures.
+    await waitFor(() =>
+      expect(field("USD per 1 JPY").value).toBe("0.00636943"),
+    );
+  });
+
+  it("re-resolves the rate when the instrument changes currency", async () => {
+    stubCandles({ JPYUSD: 0.0063694, AUDUSD: 0.70599 });
+    render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText("Instrument"), {
+      target: { value: "EURJPY" },
+    });
+    await waitFor(() =>
+      expect(field("USD per 1 JPY").value).toBe("0.0063694"),
+    );
+
+    fireEvent.change(screen.getByLabelText("Instrument"), {
+      target: { value: "EURAUD" },
+    });
+
+    // The JPY rate must not carry over onto an AUD-quoted pair.
+    await waitFor(() => expect(field("USD per 1 AUD").value).toBe("0.70599"));
+  });
+
+  it("lets the user override the fetched rate", async () => {
+    stubCandles({ JPYUSD: 0.0063694 });
+    render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText("Instrument"), {
+      target: { value: "EURJPY" },
+    });
+    await waitFor(() =>
+      expect(field("USD per 1 JPY").value).toBe("0.0063694"),
+    );
+
+    fireEvent.change(field("USD per 1 JPY"), { target: { value: "0.0064" } });
+
+    expect(screen.getByText(/Using your rate/)).toBeInTheDocument();
+    expect(screen.queryByText(/Live rate/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/cross pair/)).not.toBeInTheDocument();
+
+    // The override is reversible, including after clearing the field entirely.
+    fireEvent.change(field("USD per 1 JPY"), { target: { value: "" } });
+    fireEvent.click(screen.getByText("Use live rate"));
+
+    expect(field("USD per 1 JPY").value).toBe("0.0063694");
+    expect(screen.getByText(/Live rate/)).toBeInTheDocument();
+  });
+
+  it("asks for the rate manually when the lookup fails", async () => {
+    // Neither leg priced — the endpoint answers noData for both.
+    stubCandles({});
+    render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText("Instrument"), {
+      target: { value: "EURJPY" },
+    });
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("Couldn't load the JPY rate. Enter it manually."),
+      ).toBeInTheDocument(),
+    );
     expect(screen.getByText(/cross pair/)).toBeInTheDocument();
 
     fireEvent.change(field("USD per 1 JPY"), { target: { value: "0.0064" } });

@@ -143,7 +143,10 @@ describe("calculateLotSize", () => {
     expect(result.warnings.join(" ")).toContain("below the 0.01 minimum");
   });
 
-  it("converts a cross pair with a manually supplied quote rate", () => {
+  it.each([
+    ["live" as const],
+    ["manual" as const],
+  ])("converts a cross pair with a %s quote rate", (origin) => {
     // 100 pip stop on 100k units of JPY exposure = 100,000 JPY = $636.94 per lot.
     const result = calculateLotSize({
       instrument: instrument("EUR/JPY"),
@@ -152,13 +155,29 @@ describe("calculateLotSize", () => {
       entryPrice: 170,
       stopLoss: 169,
       direction: "BUY",
-      manualQuoteRate: 1 / 157,
+      quoteRateOverride: 1 / 157,
+      quoteRateOrigin: origin,
     });
 
-    expect(result.quoteRateSource).toBe("manual");
+    // The rate does the same work either way; only its provenance differs.
+    expect(result.quoteRateSource).toBe(origin);
     expect(result.warnings).toEqual([]);
     expect(result.riskPerLot).toBeCloseTo(636.9427, 4);
     expect(result.roundedLots).toBeCloseTo(0.15, 6);
+  });
+
+  it("treats an override as manual when no origin is given", () => {
+    const result = calculateLotSize({
+      instrument: instrument("EUR/JPY"),
+      accountBalance: 10_000,
+      riskPercent: 1,
+      entryPrice: 170,
+      stopLoss: 169,
+      direction: "BUY",
+      quoteRateOverride: 1 / 157,
+    });
+
+    expect(result.quoteRateSource).toBe("manual");
   });
 
   it("reports reward targets as R multiples of the risk", () => {

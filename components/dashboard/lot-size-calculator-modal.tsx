@@ -11,6 +11,7 @@ import {
   calculateLotSize,
   resolveInstrument,
 } from "@/lib/lot-size";
+import { fetchUsdPerUnit } from "@/lib/quote-rate";
 import {
   readLotSizeSettings,
   writeLotSizeSettings,
@@ -112,7 +113,17 @@ export function LotSizeCalculatorModal({
   const [stopLoss, setStopLoss] = useState(() =>
     priceToInput(signal.exitTargets?.stopLoss),
   );
-  const [quoteRate, setQuoteRate] = useState("");
+  // Both rate slots carry the currency they belong to, so a result that arrives
+  // after the instrument changed — or an override typed against the old pair —
+  // is ignored rather than silently applied to the wrong currency.
+  const [fetchedRate, setFetchedRate] = useState<{
+    currency: string;
+    rate: number | null;
+  } | null>(null);
+  const [manualRate, setManualRate] = useState<{
+    currency: string;
+    value: string;
+  } | null>(null);
 
   const balanceValue = Number(balance);
   const riskValue = Number(risk);
@@ -150,6 +161,46 @@ export function LotSizeCalculatorModal({
     CALCULATOR_INSTRUMENTS[0];
   // A cross has USD on neither leg, so nothing on the signal converts its risk.
   const isCross = instrument.base !== "USD" && instrument.quote !== "USD";
+  // Pull the quote currency's USD rate whenever the instrument changes, so
+  // switching EUR/AUD -> GBP/JPY re-resolves the conversion instead of carrying
+  // the previous currency's rate over. Non-crosses need no lookup at all.
+  useEffect(() => {
+    if (!isCross) return;
+
+    let cancelled = false;
+    fetchUsdPerUnit(instrument.quote).then((rate) => {
+      if (!cancelled) setFetchedRate({ currency: instrument.quote, rate });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isCross, instrument.quote]);
+
+  // Anything belonging to another currency reads as absent, which is what makes
+  // the switch to a new pair show "loading" rather than the old pair's number.
+  const manualForQuote =
+    manualRate?.currency === instrument.quote ? manualRate.value : null;
+  const fetchedForQuote =
+    fetchedRate?.currency === instrument.quote ? fetchedRate : null;
+
+  const rateStatus: "idle" | "loading" | "live" | "error" | "manual" = !isCross
+    ? "idle"
+    : manualForQuote !== null
+      ? "manual"
+      : fetchedForQuote === null
+        ? "loading"
+        : fetchedForQuote.rate === null
+          ? "error"
+          : "live";
+
+  const quoteRate =
+    manualForQuote ??
+    (fetchedForQuote?.rate != null
+      ? // Six significant figures keeps JPY-sized rates (0.00636943) precise
+        // without printing float noise on EUR-sized ones.
+        String(Number(fetchedForQuote.rate.toPrecision(6)))
+      : "");
 
   const result = useMemo(
     () =>
@@ -162,7 +213,9 @@ export function LotSizeCalculatorModal({
         direction: signal.direction,
         takeProfit1: signal.exitTargets?.takeProfit1,
         takeProfit2: signal.exitTargets?.takeProfit2,
-        manualQuoteRate: isCross && quoteRate ? Number(quoteRate) : undefined,
+        quoteRateOverride:
+          isCross && quoteRate ? Number(quoteRate) : undefined,
+        quoteRateOrigin: rateStatus === "manual" ? "manual" : "live",
       }),
     [
       instrument,
@@ -175,6 +228,7 @@ export function LotSizeCalculatorModal({
       signal.exitTargets?.takeProfit2,
       isCross,
       quoteRate,
+      rateStatus,
     ],
   );
 
@@ -293,13 +347,44 @@ export function LotSizeCalculatorModal({
           </div>
 
           {isCross && (
-            <NumberField
-              id="lot-size-quote-rate"
-              label={`USD per 1 ${instrument.quote}`}
-              value={quoteRate}
-              onChange={setQuoteRate}
-              placeholder={`e.g. ${instrument.quote === "JPY" ? "0.0064" : "1.08"}`}
-            />
+            <div className="space-y-1">
+              <NumberField
+                id="lot-size-quote-rate"
+                label={`USD per 1 ${instrument.quote}`}
+                value={quoteRate}
+                onChange={(value) =>
+                  setManualRate({ currency: instrument.quote, value })
+                }
+                placeholder={
+                  rateStatus === "loading" ? "Loading rate…" : undefined
+                }
+              />
+              <p
+                className={cn(
+                  "text-[10px]",
+                  rateStatus === "error" ? "text-amber-400/90" : "text-zinc-500",
+                )}
+              >
+                {rateStatus === "manual" ? (
+                  <>
+                    Using your rate.{" "}
+                    <button
+                      type="button"
+                      onClick={() => setManualRate(null)}
+                      className="underline underline-offset-2 transition-colors hover:text-zinc-300"
+                    >
+                      Use live rate
+                    </button>
+                  </>
+                ) : rateStatus === "loading" ? (
+                  `Fetching the live ${instrument.quote} rate…`
+                ) : rateStatus === "live" ? (
+                  "Live rate — edit to override."
+                ) : (
+                  `Couldn't load the ${instrument.quote} rate. Enter it manually.`
+                )}
+              </p>
+            </div>
           )}
         </div>
 
