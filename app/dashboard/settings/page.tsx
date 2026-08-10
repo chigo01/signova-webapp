@@ -5,10 +5,19 @@ import { useRouter } from "next/navigation";
 import {
   AuthUserProfile,
   NotificationPreferences,
+  PendingDeletion,
   StockNewsPreferences,
   getAuthUserProfile,
   setAuthUserProfile,
 } from "@/lib/auth-user";
+import {
+  daysUntilDeletion,
+  formatDeletionDate,
+  parsePendingDeletion,
+} from "@/lib/account-deletion";
+import { DeleteAccountModal } from "@/components/account/delete-account-modal";
+import { useRevokeDeletion } from "@/components/account/use-revoke-deletion";
+import { useAuthState } from "@/components/auth/auth-provider";
 import { logout as performLogout } from "@/lib/logout";
 import { API_URL } from "@/lib/config";
 import { getAuthHeaders } from "@/lib/cookies";
@@ -58,8 +67,17 @@ function deriveUsername(profile: AuthUserProfile): string {
 
 export default function UserSettingsPage() {
   const router = useRouter();
+  // The provider is the single source of truth for deletion state so this page
+  // and the dashboard banner can never disagree about it.
+  const { pendingDeletion, refreshAuth } = useAuthState();
+  const {
+    revoke: revokeDeletion,
+    isRevoking,
+    error: revokeError,
+  } = useRevokeDeletion();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [profile, setProfile] = useState<AuthUserProfile>({});
   const [tradeReversalEnabled, setTradeReversalEnabled] = useState(true);
   const [toggleError, setToggleError] = useState<string | null>(null);
@@ -122,6 +140,7 @@ export default function UserSettingsPage() {
           tradeReversalEnabled: data.user.tradeReversalEnabled,
           notificationPreferences: data.user.notificationPreferences,
           stockNewsPreferences: data.user.stockNewsPreferences,
+          pendingDeletion: parsePendingDeletion(data.user.pendingDeletion),
         };
 
         setProfile((prev) => ({ ...prev, ...merged }));
@@ -400,6 +419,53 @@ export default function UserSettingsPage() {
           {toggleError && (
             <p className="mt-2 text-xs text-red-400">{toggleError}</p>
           )}
+
+          <div className="mt-4 rounded-md border border-red-900/60 bg-red-950/20 px-3 py-3">
+            {pendingDeletion ? (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-red-100">
+                    Scheduled for deletion on{" "}
+                    <span className="font-medium">
+                      {formatDeletionDate(pendingDeletion)}
+                    </span>
+                  </p>
+                  <p className="mt-0.5 text-xs text-red-300/80">
+                    {daysUntilDeletion(pendingDeletion)} days left. Nothing has
+                    been deleted yet.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void revokeDeletion()}
+                  disabled={isRevoking}
+                  className="shrink-0 self-start rounded-md bg-white px-3.5 py-2 text-sm font-medium text-black transition-colors hover:bg-white/90 disabled:opacity-50 sm:self-auto"
+                >
+                  {isRevoking ? "Cancelling…" : "Keep my account"}
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-zinc-200">Delete account</p>
+                  <p className="mt-0.5 text-xs text-zinc-500">
+                    Permanently deletes your account and data after a 30-day
+                    grace period.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteOpen(true)}
+                  className="shrink-0 self-start rounded-md bg-red-500 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-red-600 sm:self-auto"
+                >
+                  Delete account
+                </button>
+              </div>
+            )}
+            {revokeError && (
+              <p className="mt-2 text-xs text-red-400">{revokeError}</p>
+            )}
+          </div>
         </section>
 
         <section className="mt-4 rounded-xl border border-zinc-800 bg-[#090909] p-4 sm:p-5">
@@ -501,6 +567,19 @@ export default function UserSettingsPage() {
           )}
         </section>
       </div>
+
+      <DeleteAccountModal
+        open={isDeleteOpen}
+        onClose={() => setIsDeleteOpen(false)}
+        onScheduled={(scheduled: PendingDeletion | null) => {
+          // Keep the cached profile in step with the provider, which re-checks
+          // asynchronously — otherwise a reload would paint the old state first.
+          const next = { ...profile, pendingDeletion: scheduled };
+          setProfile(next);
+          setAuthUserProfile(next);
+          refreshAuth();
+        }}
+      />
 
       <EditProfileModal
         open={isEditOpen}

@@ -7,12 +7,16 @@ vi.mock("@/components/auth/auth-modal", () => ({
 }));
 
 function AuthProbe() {
-  const { isAuthenticated, isGuest, isLoading } = useAuthState();
+  const { isAuthenticated, isGuest, isLoading, pendingDeletion } =
+    useAuthState();
   return (
     <div>
       <span data-testid="loading">{String(isLoading)}</span>
       <span data-testid="authenticated">{String(isAuthenticated)}</span>
       <span data-testid="guest">{String(isGuest)}</span>
+      <span data-testid="pending-deletion">
+        {pendingDeletion?.scheduledFor ?? "none"}
+      </span>
     </div>
   );
 }
@@ -135,5 +139,92 @@ describe("AuthProvider session validation", () => {
       expect(screen.getByTestId("authenticated")).toHaveTextContent("true");
       expect(screen.getByTestId("guest")).toHaveTextContent("false");
     });
+  });
+});
+
+describe("AuthProvider pending deletion", () => {
+  it("exposes the scheduled deletion returned by the auth check", async () => {
+    setToken();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          user: {
+            email: "trader@example.com",
+            pendingDeletion: {
+              requestedAt: "2026-08-10T00:00:00.000Z",
+              scheduledFor: "2026-09-09T00:00:00.000Z",
+            },
+          },
+        }),
+      }),
+    );
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("pending-deletion")).toHaveTextContent(
+        "2026-09-09T00:00:00.000Z",
+      );
+    });
+    expect(screen.getByTestId("authenticated")).toHaveTextContent("true");
+  });
+
+  it("reports no pending deletion for a clean account", async () => {
+    setToken();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          user: { email: "trader@example.com", pendingDeletion: null },
+        }),
+      }),
+    );
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("authenticated")).toHaveTextContent("true");
+    });
+    expect(screen.getByTestId("pending-deletion")).toHaveTextContent("none");
+  });
+
+  it("keeps the session when the auth check body cannot be read", async () => {
+    setToken();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => {
+          throw new Error("unexpected end of JSON input");
+        },
+      }),
+    );
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    // An unreadable body says nothing about the token's validity, and must not
+    // be mistaken for "this account is not being deleted".
+    await waitFor(() => {
+      expect(screen.getByTestId("loading")).toHaveTextContent("false");
+    });
+    expect(screen.getByTestId("authenticated")).toHaveTextContent("true");
   });
 });

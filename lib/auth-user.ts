@@ -12,6 +12,16 @@ export interface StockNewsPreferences {
   changedAt?: string;
 }
 
+/**
+ * Set while the account is inside its deletion grace window. `null` is a real
+ * value here — it is what a successful revocation writes — so it must survive
+ * the localStorage round trip below rather than being treated as "absent".
+ */
+export interface PendingDeletion {
+  requestedAt?: string;
+  scheduledFor?: string;
+}
+
 export interface AuthUserProfile {
   email?: string;
   name?: string;
@@ -22,6 +32,7 @@ export interface AuthUserProfile {
   tradeReversalEnabled?: boolean;
   notificationPreferences?: NotificationPreferences;
   stockNewsPreferences?: StockNewsPreferences;
+  pendingDeletion?: PendingDeletion | null;
 }
 
 export function setAuthUserProfile(user: AuthUserProfile | null | undefined): void {
@@ -39,6 +50,7 @@ export function setAuthUserProfile(user: AuthUserProfile | null | undefined): vo
         tradeReversalEnabled: user.tradeReversalEnabled,
         notificationPreferences: user.notificationPreferences,
         stockNewsPreferences: user.stockNewsPreferences,
+        pendingDeletion: user.pendingDeletion,
       })
     );
   } catch {
@@ -63,6 +75,7 @@ export function getAuthUserProfile(): AuthUserProfile | null {
       tradeReversalEnabled,
       notificationPreferences,
       stockNewsPreferences,
+      pendingDeletion,
     } = parsed as AuthUserProfile;
     return {
       ...(typeof email === "string" ? { email } : {}),
@@ -81,6 +94,11 @@ export function getAuthUserProfile(): AuthUserProfile | null {
       ...(stockNewsPreferences && typeof stockNewsPreferences === "object"
         ? { stockNewsPreferences }
         : {}),
+      // Note this checks typeof rather than truthiness like the fields above:
+      // an explicit null is meaningful here, since it is what a successful
+      // revocation stores. Dropping it would let a stale pending state
+      // resurrect the deletion banner after the user already undid it.
+      ...(typeof pendingDeletion === "object" ? { pendingDeletion } : {}),
     };
   } catch {
     return null;

@@ -4,6 +4,7 @@ import { AuthProvider, useAuthState } from "@/components/auth/auth-provider";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { MobileBottomNav } from "@/components/dashboard/mobile-bottom-nav";
 import { MobileHeader } from "@/components/dashboard/mobile-header";
+import { DeletionBanner } from "@/components/account/deletion-banner";
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const { isLoading } = useAuthState();
@@ -23,6 +24,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:ml-64">
         <MobileHeader />
+        {/* Renders nothing unless the account is scheduled for deletion. */}
+        <DeletionBanner />
         <div className="flex min-h-0 flex-1 flex-col pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
           {children}
         </div>
