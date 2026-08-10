@@ -9,6 +9,7 @@ import {
   Target,
   ShieldAlert,
   AlertCircle,
+  Calculator,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Signal } from "@/types/signal";
@@ -24,6 +25,8 @@ import { pairToForexSymbol } from "@/lib/pair-to-forex-symbol";
 import TradingViewChart from "@/components/charts/trading-view-chart";
 import { useAuthState } from "@/components/auth/auth-provider";
 import { TradeReleaseInfo } from "@/components/dashboard/trade-release-info";
+import { LotSizeCalculatorModal } from "@/components/dashboard/lot-size-calculator-modal";
+import { resolveInstrument } from "@/lib/lot-size";
 
 function formatLevelValue(value: number): string {
   // Keep signal levels compact so they never overflow the TP/SL boxes.
@@ -58,9 +61,19 @@ function VaultSignalCard({
   locked?: boolean;
 }) {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const { promptAuth } = useAuthState();
   const isBuy = signal.direction === "BUY";
   const directionColor = isBuy ? "text-emerald-400" : "text-red-400";
+
+  // Guests never receive the stop loss (toLockedSignal omits it), and we only
+  // know contract specs for forex and metals — so crypto and anything
+  // unrecognised has no calculator rather than a guessed lot size.
+  const canCalculateLotSize =
+    !locked &&
+    resolveInstrument(signal.pair) !== null &&
+    Number.isFinite(signal.entryPrice) &&
+    Number.isFinite(signal.exitTargets?.stopLoss);
 
   const handlePlay = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -172,19 +185,43 @@ function VaultSignalCard({
       )}
 
       {/* Play Button — white pill, dark icon (mobile mock) */}
-      <button
-        type="button"
-        onClick={handlePlay}
-        disabled={isPlaying}
-        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-white px-3 py-3 text-xs font-semibold text-black transition-colors hover:bg-zinc-200 disabled:opacity-50"
-      >
-        {isPlaying ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Play className="h-4 w-4 fill-current text-black" />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={handlePlay}
+          disabled={isPlaying}
+          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-white px-3 py-3 text-xs font-semibold text-black transition-colors hover:bg-zinc-200 disabled:opacity-50"
+        >
+          {isPlaying ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Play className="h-4 w-4 fill-current text-black" />
+          )}
+          {isPlaying ? "Playing..." : "Play Signal"}
+        </button>
+
+        {canCalculateLotSize && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsCalculatorOpen(true);
+            }}
+            aria-label={`Lot size calculator for ${signal.pair}`}
+            title="Lot size calculator"
+            className="flex shrink-0 cursor-pointer items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+          >
+            <Calculator className="h-4 w-4" />
+          </button>
         )}
-        {isPlaying ? "Playing..." : "Play Signal"}
-      </button>
+      </div>
+
+      {canCalculateLotSize && isCalculatorOpen && (
+        <LotSizeCalculatorModal
+          onClose={() => setIsCalculatorOpen(false)}
+          signal={signal}
+        />
+      )}
     </div>
   );
 }
