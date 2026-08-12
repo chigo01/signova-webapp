@@ -115,6 +115,8 @@ describe("LotSizeCalculatorModal", () => {
       accountBalance: 10000,
       riskPercent: 2,
       accountCurrency: "USD",
+      costBufferPercent: 0,
+      lotStep: 0.01,
     });
   });
 
@@ -266,6 +268,8 @@ describe("LotSizeCalculatorModal", () => {
       accountBalance: 10000,
       riskPercent: 1,
       accountCurrency: "USD",
+      costBufferPercent: 0,
+      lotStep: 0.01,
     });
   });
 
@@ -328,7 +332,7 @@ describe("LotSizeCalculatorModal", () => {
         expect(field("Account balance").value).toBe("14172.54"),
       );
       expect(screen.getByText("A$")).toBeInTheDocument();
-      expect(screen.getByText(/Sized for a AUD account/)).toBeInTheDocument();
+      expect(screen.getByText(/Uses 100,000 EUR per lot/)).toBeInTheDocument();
       // EUR/USD against an AUD account now needs a USD->AUD rate.
       expect(screen.getByLabelText("AUD per 1 USD")).toBeInTheDocument();
     });
@@ -361,6 +365,8 @@ describe("LotSizeCalculatorModal", () => {
         accountBalance: 10000,
         riskPercent: 1,
         accountCurrency: "USD",
+        costBufferPercent: 0,
+        lotStep: 0.01,
       });
     });
 
@@ -389,6 +395,8 @@ describe("LotSizeCalculatorModal", () => {
           accountBalance: 10000,
           riskPercent: 1,
           accountCurrency: "GBP",
+          costBufferPercent: 0,
+          lotStep: 0.01,
         }),
       );
     });

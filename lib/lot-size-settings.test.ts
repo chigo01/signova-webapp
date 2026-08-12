@@ -32,11 +32,15 @@ describe("lot size settings", () => {
       accountBalance: 25_000,
       riskPercent: 0.5,
       accountCurrency: "JPY",
+      costBufferPercent: 10,
+      lotStep: 0.001,
     });
     expect(readLotSizeSettings()).toEqual({
       accountBalance: 25_000,
       riskPercent: 0.5,
       accountCurrency: "JPY",
+      costBufferPercent: 10,
+      lotStep: 0.001,
     });
   });
 
@@ -63,6 +67,8 @@ describe("lot size settings", () => {
       accountBalance: 25_000,
       riskPercent: DEFAULT_LOT_SIZE_SETTINGS.riskPercent,
       accountCurrency: DEFAULT_LOT_SIZE_SETTINGS.accountCurrency,
+      costBufferPercent: DEFAULT_LOT_SIZE_SETTINGS.costBufferPercent,
+      lotStep: DEFAULT_LOT_SIZE_SETTINGS.lotStep,
     });
   });
 
@@ -75,6 +81,8 @@ describe("lot size settings", () => {
       accountBalance: 25_000,
       riskPercent: 2,
       accountCurrency: "USD",
+      costBufferPercent: 0,
+      lotStep: 0.01,
     });
   });
 

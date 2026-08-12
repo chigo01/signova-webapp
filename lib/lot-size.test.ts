@@ -360,7 +360,7 @@ describe("calculateLotSize", () => {
     expect(result.targets[0].rMultiple).toBeCloseTo(2, 6);
   });
 
-  it("flags a stop loss on the wrong side of entry", () => {
+  it("blocks a stop loss on the wrong side of entry", () => {
     const result = calculateLotSize({
       instrument: instrument("EUR/USD"),
       accountBalance: 10_000,
@@ -370,10 +370,10 @@ describe("calculateLotSize", () => {
       direction: "BUY",
     });
 
-    expect(result.error).toBeUndefined();
-    expect(result.warnings).toContain(
+    expect(result.error).toBe(
       "Stop loss is on the wrong side of entry for a BUY trade.",
     );
+    expect(result.roundedLots).toBe(0);
   });
 
   it("warns when risk exceeds a sane share of the account", () => {
@@ -404,6 +404,45 @@ describe("calculateLotSize", () => {
     expect(result.units).toBe(0);
     expect(result.actualRisk).toBe(0);
     expect(result.warnings.join(" ")).toContain("below the 0.01 minimum");
+  });
+
+  it("supports broker specs, lot steps and a trading-cost buffer", () => {
+    const result = calculateLotSize({
+      instrument: instrument("XAU/USD"),
+      accountBalance: 10_000,
+      riskPercent: 1,
+      entryPrice: 2000,
+      stopLoss: 1999,
+      direction: "BUY",
+      contractSizeOverride: 10,
+      pipSizeOverride: 0.01,
+      lotStep: 0.001,
+      costBufferPercent: 10,
+    });
+
+    expect(result.riskAmount).toBe(100);
+    expect(result.costAllowance).toBe(10);
+    expect(result.tradeRiskBudget).toBe(90);
+    expect(result.contractSize).toBe(10);
+    expect(result.pipSize).toBe(0.01);
+    expect(result.roundedLots).toBe(9);
+    expect(result.actualRisk + result.costAllowance).toBeLessThanOrEqual(
+      result.riskAmount,
+    );
+  });
+
+  it("strictly floors to the broker step without crossing raw size", () => {
+    const result = calculateLotSize({
+      instrument: instrument("EUR/USD"),
+      accountBalance: 10_000,
+      riskPercent: 1,
+      entryPrice: 1.1,
+      stopLoss: 1.097,
+      lotStep: 0.001,
+    });
+
+    expect(result.roundedLots).toBeLessThanOrEqual(result.lots);
+    expect(result.actualRisk).toBeLessThanOrEqual(result.tradeRiskBudget);
   });
 
   it.each([

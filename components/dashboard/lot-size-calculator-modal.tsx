@@ -158,6 +158,18 @@ export function LotSizeCalculatorModal({
   const [stopLoss, setStopLoss] = useState(() =>
     priceToInput(signal.exitTargets?.stopLoss),
   );
+  const initialInstrument =
+    resolveInstrument(signal.pair) ?? CALCULATOR_INSTRUMENTS[0];
+  const [contractSize, setContractSize] = useState(() =>
+    String(initialInstrument.contractSize),
+  );
+  const [pipSize, setPipSize] = useState(() =>
+    String(initialInstrument.pipSize),
+  );
+  const [lotStep, setLotStep] = useState(() => String(seed.lotStep));
+  const [costBuffer, setCostBuffer] = useState(() =>
+    String(seed.costBufferPercent),
+  );
   // Both rate slots carry the conversion they belong to, so a result that
   // arrives after the instrument or account currency changed is ignored rather
   // than silently applied to the wrong pair of currencies.
@@ -185,6 +197,8 @@ export function LotSizeCalculatorModal({
 
   const balanceValue = Number(balance);
   const riskValue = Number(risk);
+  const lotStepValue = Number(lotStep);
+  const costBufferValue = Number(costBuffer);
 
   // Persist each field independently: a mid-typed balance ("", "1.") must not
   // block a currency change from sticking, nor clobber the stored balance.
@@ -203,8 +217,23 @@ export function LotSizeCalculatorModal({
           ? riskValue
           : stored.riskPercent,
       accountCurrency,
+      costBufferPercent:
+        Number.isFinite(costBufferValue) && costBufferValue >= 0
+          ? costBufferValue
+          : stored.costBufferPercent,
+      lotStep:
+        Number.isFinite(lotStepValue) && lotStepValue > 0
+          ? lotStepValue
+          : stored.lotStep,
     });
-  }, [balanceValue, riskValue, accountCurrency, isConverting]);
+  }, [
+    balanceValue,
+    riskValue,
+    accountCurrency,
+    costBufferValue,
+    lotStepValue,
+    isConverting,
+  ]);
 
   // Lock body scroll while the modal is open.
   useEffect(() => {
@@ -232,6 +261,18 @@ export function LotSizeCalculatorModal({
   const needsRate =
     instrument.quote !== accountCurrency && instrument.base !== accountCurrency;
   const rateKey = `${instrument.quote}->${accountCurrency}`;
+
+  const switchInstrument = useCallback((nextSymbol: string) => {
+    const next = CALCULATOR_INSTRUMENTS.find(
+      (item) => item.symbol === nextSymbol,
+    );
+    if (!next) return;
+    setSymbol(nextSymbol);
+    // Broker overrides belong to one instrument; never carry a gold contract
+    // size into a forex calculation when the dropdown changes.
+    setContractSize(String(next.contractSize));
+    setPipSize(String(next.pipSize));
+  }, []);
 
   // Re-resolve whenever either side of the conversion changes, so switching
   // EUR/AUD -> GBP/JPY or USD -> JPY never carries the old rate over.
@@ -361,6 +402,10 @@ export function LotSizeCalculatorModal({
         quoteRateOverride:
           needsRate && quoteRate ? Number(quoteRate) : undefined,
         quoteRateOrigin: rateStatus === "manual" ? "manual" : "live",
+        contractSizeOverride: Number(contractSize),
+        pipSizeOverride: Number(pipSize),
+        lotStep: lotStepValue,
+        costBufferPercent: costBufferValue,
       }),
     [
       instrument,
@@ -375,6 +420,10 @@ export function LotSizeCalculatorModal({
       needsRate,
       quoteRate,
       rateStatus,
+      contractSize,
+      pipSize,
+      lotStepValue,
+      costBufferValue,
     ],
   );
 
@@ -421,7 +470,7 @@ export function LotSizeCalculatorModal({
               id="lot-size-instrument"
               label="Instrument"
               value={instrument.symbol}
-              onChange={setSymbol}
+              onChange={switchInstrument}
             >
               {CALCULATOR_INSTRUMENTS.map((item) => (
                 <option key={item.symbol} value={item.symbol}>
@@ -544,6 +593,42 @@ export function LotSizeCalculatorModal({
               </p>
             </div>
           )}
+
+          <details className="rounded-lg border border-zinc-800/80 bg-zinc-900/30 px-3 py-2">
+            <summary className="cursor-pointer text-[11px] font-medium text-zinc-300">
+              Broker settings &amp; trading costs
+            </summary>
+            <p className="mt-1 text-[10px] text-zinc-500">
+              Match your broker contract and reserve part of the risk budget for costs.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <NumberField
+                id="lot-size-contract-size"
+                label="Contract size"
+                value={contractSize}
+                onChange={setContractSize}
+              />
+              <NumberField
+                id="lot-size-pip-size"
+                label="Pip size"
+                value={pipSize}
+                onChange={setPipSize}
+              />
+              <NumberField
+                id="lot-size-lot-step"
+                label="Minimum lot step"
+                value={lotStep}
+                onChange={setLotStep}
+              />
+              <NumberField
+                id="lot-size-cost-buffer"
+                label="Cost buffer"
+                value={costBuffer}
+                onChange={setCostBuffer}
+                suffix="%"
+              />
+            </div>
+          </details>
         </div>
 
         {/* A rate still in flight is not a failure. Without this the panel would
@@ -578,6 +663,12 @@ export function LotSizeCalculatorModal({
                 label="Risk at this size"
                 value={`${formatMoney(result.actualRisk, accountCurrency)} of ${formatMoney(result.riskAmount, accountCurrency)}`}
               />
+              {result.costAllowance > 0 && (
+                <ResultRow
+                  label="Reserved for costs"
+                  value={formatMoney(result.costAllowance, accountCurrency)}
+                />
+              )}
               <ResultRow
                 label="Stop distance"
                 value={`${result.stopPips.toFixed(1)} pips`}
@@ -612,10 +703,10 @@ export function LotSizeCalculatorModal({
         )}
 
         <p className="mt-4 border-t border-zinc-800/80 pt-3 text-[10px] leading-relaxed text-zinc-600">
-          Sized for a {accountCurrency} account using standard contract sizes (
-          {formatUnits(instrument.contractSize)} {instrument.base} per lot).
-          Contract specs and minimum lot steps vary by broker — verify before
-          trading.
+          Uses {formatUnits(result.contractSize)} {instrument.base} per lot, pip
+          size {result.pipSize}, and lot step {result.lotStep}. The buffer
+          reserves risk capacity; it does not estimate actual spread,
+          commission, slippage, or gaps.
         </p>
       </div>
     </div>

@@ -18,12 +18,16 @@ export interface LotSizeSettings {
   riskPercent: number;
   /** ISO code from ACCOUNT_CURRENCIES. Unknown or absent reads as USD. */
   accountCurrency: string;
+  costBufferPercent: number;
+  lotStep: number;
 }
 
 export const DEFAULT_LOT_SIZE_SETTINGS: LotSizeSettings = {
   accountBalance: 10000,
   riskPercent: 1,
   accountCurrency: DEFAULT_ACCOUNT_CURRENCY,
+  costBufferPercent: 0,
+  lotStep: 0.01,
 };
 
 export function readLotSizeSettings(): LotSizeSettings {
@@ -34,6 +38,8 @@ export function readLotSizeSettings(): LotSizeSettings {
     const parsed = JSON.parse(raw) as Partial<LotSizeSettings> | null;
     const accountBalance = Number(parsed?.accountBalance);
     const riskPercent = Number(parsed?.riskPercent);
+    const costBufferPercent = Number(parsed?.costBufferPercent);
+    const lotStep = Number(parsed?.lotStep);
     return {
       accountBalance:
         Number.isFinite(accountBalance) && accountBalance > 0
@@ -48,6 +54,16 @@ export function readLotSizeSettings(): LotSizeSettings {
       accountCurrency: isAccountCurrency(parsed?.accountCurrency)
         ? parsed.accountCurrency
         : DEFAULT_LOT_SIZE_SETTINGS.accountCurrency,
+      costBufferPercent:
+        Number.isFinite(costBufferPercent) &&
+        costBufferPercent >= 0 &&
+        costBufferPercent < 100
+          ? costBufferPercent
+          : DEFAULT_LOT_SIZE_SETTINGS.costBufferPercent,
+      lotStep:
+        Number.isFinite(lotStep) && lotStep > 0
+          ? lotStep
+          : DEFAULT_LOT_SIZE_SETTINGS.lotStep,
     };
   } catch {
     return DEFAULT_LOT_SIZE_SETTINGS;

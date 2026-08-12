@@ -164,6 +164,12 @@ export interface LotSizeInput {
   quoteRateOverride?: number;
   /** Labels where quoteRateOverride came from. Defaults to "manual". */
   quoteRateOrigin?: QuoteRateOrigin;
+  /** Broker-specific overrides. Defaults retain the standard instrument spec. */
+  contractSizeOverride?: number;
+  pipSizeOverride?: number;
+  lotStep?: number;
+  /** Percentage of the risk amount reserved for spread/commission/slippage. */
+  costBufferPercent?: number;
 }
 
 export interface LotSizeResult {
@@ -190,6 +196,11 @@ export interface LotSizeResult {
   valuePerPip: number;
   /** Account currency actually at risk at roundedLots, i.e. after flooring. */
   actualRisk: number;
+  tradeRiskBudget: number;
+  costAllowance: number;
+  contractSize: number;
+  pipSize: number;
+  lotStep: number;
   targets: LotSizeTarget[];
 }
 
@@ -209,14 +220,28 @@ function failure(error: string, quoteRate = 1): LotSizeResult {
     units: 0,
     valuePerPip: 0,
     actualRisk: 0,
+    tradeRiskBudget: 0,
+    costAllowance: 0,
+    contractSize: 0,
+    pipSize: 0,
+    lotStep: 0,
     targets: [],
   };
 }
 
 /** Floor to the 0.01 lot step, guarding against float noise (1.0 * 100 = 100.00000000000001). */
-function floorToLotStep(lots: number): number {
-  const steps = Math.floor(Number((lots / MIN_LOT_STEP).toFixed(6)));
-  return steps * MIN_LOT_STEP;
+function floorToLotStep(lots: number, lotStep: number): number {
+  let steps = Math.floor(lots / lotStep + 1e-12);
+  // Strictly downward-only: never let floating-point representation produce a
+  // materially rounded size above the raw risk-limited position. The tolerance
+  // only restores exact decimal boundaries represented one ULP below them.
+  while (
+    steps > 0 &&
+    steps * lotStep - lots > Math.max(1, Math.abs(lots)) * 1e-12
+  ) {
+    steps -= 1;
+  }
+  return steps * lotStep;
 }
 
 function resolveQuoteRate(
@@ -274,7 +299,14 @@ export function calculateLotSize(input: LotSizeInput): LotSizeResult {
     takeProfit2,
     quoteRateOverride,
     quoteRateOrigin = "manual",
+    contractSizeOverride,
+    pipSizeOverride,
+    lotStep = MIN_LOT_STEP,
+    costBufferPercent = 0,
   } = input;
+
+  const contractSize = contractSizeOverride ?? instrument.contractSize;
+  const pipSize = pipSizeOverride ?? instrument.pipSize;
 
   const accountCurrency = rawAccountCurrency.toUpperCase();
 
@@ -293,10 +325,37 @@ export function calculateLotSize(input: LotSizeInput): LotSizeResult {
   if (!Number.isFinite(stopLoss) || stopLoss <= 0) {
     return failure("Enter a stop loss greater than 0.");
   }
+  if (!Number.isFinite(contractSize) || contractSize <= 0) {
+    return failure("Enter a contract size greater than 0.");
+  }
+  if (!Number.isFinite(pipSize) || pipSize <= 0) {
+    return failure("Enter a pip size greater than 0.");
+  }
+  if (!Number.isFinite(lotStep) || lotStep <= 0) {
+    return failure("Enter a lot step greater than 0.");
+  }
+  if (
+    !Number.isFinite(costBufferPercent) ||
+    costBufferPercent < 0 ||
+    costBufferPercent >= 100
+  ) {
+    return failure("Cost buffer must be from 0% to under 100%.");
+  }
 
   const stopDistance = Math.abs(entryPrice - stopLoss);
   if (stopDistance === 0) {
     return failure("Stop loss can't equal the entry price.");
+  }
+
+  const isSell =
+    direction === "SELL" || (direction !== "BUY" && stopLoss > entryPrice);
+  const stopIsOnWrongSide = isSell
+    ? stopLoss < entryPrice
+    : stopLoss > entryPrice;
+  if (direction && direction !== "HOLD" && stopIsOnWrongSide) {
+    return failure(
+      `Stop loss is on the wrong side of entry for a ${direction} trade.`,
+    );
   }
 
   const warnings: string[] = [];
@@ -328,25 +387,16 @@ export function calculateLotSize(input: LotSizeInput): LotSizeResult {
   }
 
   // HOLD carries no side, so infer it from where the stop sits.
-  const isSell =
-    direction === "SELL" || (direction !== "BUY" && stopLoss > entryPrice);
-  const stopIsOnWrongSide = isSell
-    ? stopLoss < entryPrice
-    : stopLoss > entryPrice;
-  if (direction && direction !== "HOLD" && stopIsOnWrongSide) {
-    warnings.push(
-      `Stop loss is on the wrong side of entry for a ${direction} trade.`,
-    );
-  }
-
   const riskAmount = (accountBalance * riskPercent) / 100;
-  const riskPerLot = stopDistance * instrument.contractSize * quoteRate;
-  const lots = riskAmount / riskPerLot;
-  const roundedLots = floorToLotStep(lots);
+  const costAllowance = (riskAmount * costBufferPercent) / 100;
+  const tradeRiskBudget = riskAmount - costAllowance;
+  const riskPerLot = stopDistance * contractSize * quoteRate;
+  const lots = tradeRiskBudget / riskPerLot;
+  const roundedLots = floorToLotStep(lots, lotStep);
 
-  if (roundedLots < MIN_LOT_STEP) {
+  if (roundedLots < lotStep) {
     warnings.push(
-      `This works out to ${lots.toFixed(4)} lots — below the ${MIN_LOT_STEP} minimum. Increase the balance or risk %, or tighten the stop.`,
+      `This works out to ${lots.toFixed(4)} lots — below the ${lotStep} minimum. Increase the balance or risk %, or tighten the stop.`,
     );
   }
 
@@ -357,7 +407,7 @@ export function calculateLotSize(input: LotSizeInput): LotSizeResult {
     targets.push({
       label,
       price,
-      profit: favourableMove * instrument.contractSize * quoteRate * roundedLots,
+      profit: favourableMove * contractSize * quoteRate * roundedLots,
       rMultiple: favourableMove / stopDistance,
     });
   };
@@ -368,16 +418,21 @@ export function calculateLotSize(input: LotSizeInput): LotSizeResult {
     warnings,
     riskAmount,
     stopDistance,
-    stopPips: stopDistance / instrument.pipSize,
+    stopPips: stopDistance / pipSize,
     quoteRate,
     quoteRateSource,
     riskPerLot,
     lots,
     roundedLots,
-    units: roundedLots * instrument.contractSize,
+    units: roundedLots * contractSize,
     valuePerPip:
-      instrument.pipSize * instrument.contractSize * quoteRate * roundedLots,
-    actualRisk: roundedLots * riskPerLot,
+      pipSize * contractSize * quoteRate * roundedLots,
+    actualRisk: Math.min(roundedLots * riskPerLot, tradeRiskBudget),
+    tradeRiskBudget,
+    costAllowance,
+    contractSize,
+    pipSize,
+    lotStep,
     targets,
   };
 }
