@@ -70,7 +70,7 @@ describe("calculateLotSize", () => {
 
     expect(result.error).toBeUndefined();
     expect(result.warnings).toEqual([]);
-    expect(result.quoteRateSource).toBe("quote-is-usd");
+    expect(result.quoteRateSource).toBe("quote-is-account");
     expect(result.quoteRate).toBe(1);
     expect(result.riskAmount).toBeCloseTo(100, 6);
     expect(result.stopPips).toBeCloseTo(30, 6);
@@ -122,7 +122,7 @@ describe("calculateLotSize", () => {
     expect(result.actualRisk).toBeCloseTo(1000, 6);
   });
 
-  it("warns and leaves a cross pair unconverted when no rate is supplied", () => {
+  it("refuses to size a pair it can't convert, rather than guessing", () => {
     const result = calculateLotSize({
       instrument: instrument("EUR/JPY"),
       accountBalance: 10_000,
@@ -132,15 +132,44 @@ describe("calculateLotSize", () => {
       direction: "BUY",
     });
 
-    expect(result.error).toBeUndefined();
-    expect(result.quoteRateSource).toBe("assumed");
-    expect(result.quoteRate).toBe(1);
-    expect(result.warnings[0]).toContain("cross pair");
-    expect(result.warnings[0]).toContain("1 JPY");
-    // Treating JPY as USD makes the stop look ~157x more expensive than it is,
-    // which sizes the position into nothing — a second, corroborating warning.
+    expect(result.error).toContain("EUR/JPY");
+    expect(result.error).toContain("JPY/USD");
+    expect(result.error).toContain("1 JPY");
     expect(result.roundedLots).toBe(0);
-    expect(result.warnings.join(" ")).toContain("below the 0.01 minimum");
+    expect(result.targets).toEqual([]);
+  });
+
+  // The reason the case above is an error and not a warning. Sizing on the
+  // fallback rate of 1 is not merely imprecise — off a non-USD account it is
+  // wrong in the dangerous direction.
+  it("never sizes on the fallback rate, which would be 159x too large here", () => {
+    const unconverted = calculateLotSize({
+      instrument: instrument("EUR/USD"),
+      accountCurrency: "JPY",
+      accountBalance: 1_592_950,
+      riskPercent: 1,
+      entryPrice: 1.0842,
+      stopLoss: 1.0812,
+      direction: "BUY",
+    });
+    expect(unconverted.error).toBeDefined();
+    expect(unconverted.roundedLots).toBe(0);
+
+    // What it would have produced had rate 1 been allowed through: ~53 lots,
+    // against the ~0.33 the correct rate gives.
+    const correct = calculateLotSize({
+      instrument: instrument("EUR/USD"),
+      accountCurrency: "JPY",
+      accountBalance: 1_592_950,
+      riskPercent: 1,
+      entryPrice: 1.0842,
+      stopLoss: 1.0812,
+      direction: "BUY",
+      quoteRateOverride: 159.295,
+      quoteRateOrigin: "live",
+    });
+    expect(correct.error).toBeUndefined();
+    expect(correct.roundedLots).toBeCloseTo(0.33, 2);
   });
 
   it.each([
@@ -178,6 +207,105 @@ describe("calculateLotSize", () => {
     });
 
     expect(result.quoteRateSource).toBe("manual");
+  });
+
+  describe("account currency", () => {
+    it("needs no conversion when the pair is quoted in it", () => {
+      // An AUD account trading EUR/AUD already earns its P&L in AUD.
+      const result = calculateLotSize({
+        instrument: instrument("EUR/AUD"),
+        accountCurrency: "AUD",
+        accountBalance: 10_000,
+        riskPercent: 1,
+        entryPrice: 1.65,
+        stopLoss: 1.64,
+        direction: "BUY",
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.quoteRateSource).toBe("quote-is-account");
+      expect(result.quoteRate).toBe(1);
+      expect(result.riskPerLot).toBeCloseTo(1000, 6);
+      expect(result.roundedLots).toBeCloseTo(0.1, 6);
+    });
+
+    it("derives the rate from entry when the pair is based on it", () => {
+      // GBP/JPY at 195 means 1 GBP = 195 JPY, so a GBP account converts at
+      // 1/195 with no market data. The old code called this an unconvertible
+      // cross because neither leg was USD.
+      const result = calculateLotSize({
+        instrument: instrument("GBP/JPY"),
+        accountCurrency: "GBP",
+        accountBalance: 10_000,
+        riskPercent: 1,
+        entryPrice: 195,
+        stopLoss: 194.5,
+        direction: "BUY",
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.quoteRateSource).toBe("derived-from-entry");
+      expect(result.quoteRate).toBeCloseTo(1 / 195, 10);
+      expect(result.riskPerLot).toBeCloseTo(256.4103, 4);
+    });
+
+    it("converts a USD-quoted pair for a non-USD account", () => {
+      // A JPY account on EUR/USD: risk is in USD, converted at 159.295 JPY/USD.
+      const result = calculateLotSize({
+        instrument: instrument("EUR/USD"),
+        accountCurrency: "JPY",
+        accountBalance: 1_592_950,
+        riskPercent: 1,
+        entryPrice: 1.0842,
+        stopLoss: 1.0812,
+        direction: "BUY",
+        quoteRateOverride: 159.295,
+        quoteRateOrigin: "live",
+      });
+
+      expect(result.quoteRateSource).toBe("live");
+      expect(result.riskAmount).toBeCloseTo(15_929.5, 4);
+      expect(result.riskPerLot).toBeCloseTo(47_788.5, 1);
+      expect(result.roundedLots).toBeCloseTo(0.33, 6);
+    });
+
+    it("sizes against a crypto-denominated account", () => {
+      // 0.25 BTC at 1% risk, converted at 1/95,000 BTC per USD.
+      const result = calculateLotSize({
+        instrument: instrument("EUR/USD"),
+        accountCurrency: "BTC",
+        accountBalance: 0.25,
+        riskPercent: 1,
+        entryPrice: 1.0842,
+        stopLoss: 1.0812,
+        direction: "BUY",
+        quoteRateOverride: 1 / 95_000,
+        quoteRateOrigin: "live",
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.riskAmount).toBeCloseTo(0.0025, 10);
+      expect(result.riskPerLot).toBeCloseTo(300 / 95_000, 10);
+      expect(result.roundedLots).toBeCloseTo(0.79, 2);
+    });
+
+    it("defaults to USD and accepts a lowercase code", () => {
+      const base = {
+        instrument: instrument("EUR/USD"),
+        accountBalance: 10_000,
+        riskPercent: 1,
+        entryPrice: 1.0842,
+        stopLoss: 1.0812,
+        direction: "BUY" as const,
+      };
+
+      const implicit = calculateLotSize(base);
+      const lowercase = calculateLotSize({ ...base, accountCurrency: "usd" });
+
+      expect(implicit.quoteRateSource).toBe("quote-is-account");
+      expect(lowercase.quoteRateSource).toBe("quote-is-account");
+      expect(lowercase.roundedLots).toBe(implicit.roundedLots);
+    });
   });
 
   it("reports reward targets as R multiples of the risk", () => {

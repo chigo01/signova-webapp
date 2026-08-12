@@ -1,20 +1,29 @@
-// Account balance and risk % for the lot size calculator, persisted locally.
+// Account balance, currency and risk % for the lot size calculator, persisted
+// locally.
 //
-// These two values are identical for every signal, so making the user retype
-// them on each card would be the whole feature's friction. There's no server-side
-// notion of a trading account balance (lib/auth-user.ts has no such field, and
-// lib/payments.ts "balance" is subscription credit), so this is device-local.
+// These values are identical for every signal, so making the user retype them on
+// each card would be the whole feature's friction. There's no server-side notion
+// of a trading account (lib/auth-user.ts has no such field, and lib/payments.ts
+// "balance" is subscription credit), so this is device-local.
+
+import {
+  DEFAULT_ACCOUNT_CURRENCY,
+  isAccountCurrency,
+} from "./account-currency";
 
 const STORAGE_KEY = "signova_lot_size_settings";
 
 export interface LotSizeSettings {
   accountBalance: number;
   riskPercent: number;
+  /** ISO code from ACCOUNT_CURRENCIES. Unknown or absent reads as USD. */
+  accountCurrency: string;
 }
 
 export const DEFAULT_LOT_SIZE_SETTINGS: LotSizeSettings = {
   accountBalance: 10000,
   riskPercent: 1,
+  accountCurrency: DEFAULT_ACCOUNT_CURRENCY,
 };
 
 export function readLotSizeSettings(): LotSizeSettings {
@@ -34,6 +43,11 @@ export function readLotSizeSettings(): LotSizeSettings {
         Number.isFinite(riskPercent) && riskPercent > 0
           ? riskPercent
           : DEFAULT_LOT_SIZE_SETTINGS.riskPercent,
+      // Checked against the allowlist rather than just typeof: a stale or
+      // hand-edited code would otherwise reach Intl.NumberFormat and /candles.
+      accountCurrency: isAccountCurrency(parsed?.accountCurrency)
+        ? parsed.accountCurrency
+        : DEFAULT_LOT_SIZE_SETTINGS.accountCurrency,
     };
   } catch {
     return DEFAULT_LOT_SIZE_SETTINGS;

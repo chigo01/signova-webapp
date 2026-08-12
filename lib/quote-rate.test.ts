@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fetchUsdPerUnit, resetQuoteRateCache } from "./quote-rate";
+import {
+  fetchAccountPerQuoteUnit,
+  fetchUsdPerUnit,
+  peekUsdPerUnit,
+  resetQuoteRateCache,
+} from "./quote-rate";
 
 /** Answers like /candles: a known symbol returns a bar, anything else noData. */
 function stubCandles(closes: Record<string, number>, ok = true) {
@@ -111,5 +116,117 @@ describe("fetchUsdPerUnit", () => {
 
     stubCandles({ AUDUSD: 0.70599 });
     expect(await fetchUsdPerUnit("AUD")).toBe(0.70599);
+  });
+});
+
+describe("peekUsdPerUnit", () => {
+  it("answers USD without a request", () => {
+    const fetchMock = stubCandles({});
+    expect(peekUsdPerUnit("USD")).toBe(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns null for a cold currency, never fetching", () => {
+    const fetchMock = stubCandles({ AUDUSD: 0.70599 });
+    expect(peekUsdPerUnit("AUD")).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns a warmed rate, and forgets it after a reset", async () => {
+    stubCandles({ AUDUSD: 0.70599 });
+    await fetchUsdPerUnit("AUD");
+
+    expect(peekUsdPerUnit("AUD")).toBe(0.70599);
+
+    resetQuoteRateCache();
+    expect(peekUsdPerUnit("AUD")).toBeNull();
+  });
+});
+
+describe("fetchAccountPerQuoteUnit", () => {
+  it.each([["USD"], ["JPY"], ["BTC"]])(
+    "is exactly 1 with no request when the account is held in %s and the pair is quoted in it",
+    async (code) => {
+      const fetchMock = stubCandles({});
+
+      expect(await fetchAccountPerQuoteUnit(code, code)).toEqual({
+        rate: 1,
+        missing: "none",
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("leaves a USD account's rate bit-identical to the raw quote leg", async () => {
+    stubCandles({ JPYUSD: 0.0063694 });
+
+    const composed = await fetchAccountPerQuoteUnit("JPY", "USD");
+
+    // Dividing by an exact 1 must not perturb the value — the modal renders
+    // this to six significant figures and the string has to stay stable.
+    expect(composed.rate).toBe(0.0063694);
+    expect(composed.missing).toBe("none");
+  });
+
+  it("inverts when the account currency is the quoted one", async () => {
+    stubCandles({ AUDUSD: 0.70559 });
+
+    const { rate } = await fetchAccountPerQuoteUnit("USD", "AUD");
+
+    expect(rate).toBeCloseTo(1 / 0.70559, 10);
+  });
+
+  it("composes two non-USD legs", async () => {
+    stubCandles({ JPYUSD: 0.0063694, AUDUSD: 0.70559 });
+
+    const { rate } = await fetchAccountPerQuoteUnit("JPY", "AUD");
+
+    expect(rate).toBeCloseTo(0.0063694 / 0.70559, 12);
+  });
+
+  it.each([
+    // Only the account leg (AUD) prices, so the quote leg is what's missing.
+    [{ AUDUSD: 0.70559 }, "quote" as const],
+    // Only the quote leg (JPY) prices, so the account leg is what's missing.
+    [{ JPYUSD: 0.0063694 }, "account" as const],
+    [{}, "both" as const],
+  ])("names the unpriced leg: %o -> %s", async (closes, missing) => {
+    stubCandles(closes);
+
+    // Quote JPY, account AUD: whichever of the two the stub omits is the one
+    // reported, so the caller can say which currency needs a manual rate.
+    expect(await fetchAccountPerQuoteUnit("JPY", "AUD")).toEqual({
+      rate: null,
+      missing,
+    });
+  });
+
+  it("reports the account leg when a crypto account can't be priced", async () => {
+    stubCandles({ JPYUSD: 0.0063694 });
+
+    expect(await fetchAccountPerQuoteUnit("JPY", "BTC")).toEqual({
+      rate: null,
+      missing: "account",
+    });
+  });
+
+  it("prices a crypto account when the feed carries it", async () => {
+    stubCandles({ BTCUSD: 95_000 });
+
+    const { rate } = await fetchAccountPerQuoteUnit("USD", "BTC");
+
+    expect(rate).toBeCloseTo(1 / 95_000, 12);
+  });
+
+  it("rides the existing dedupe rather than adding a second cache", async () => {
+    const fetchMock = stubCandles({ JPYUSD: 0.0063694, AUDUSD: 0.70559 });
+
+    await Promise.all([
+      fetchAccountPerQuoteUnit("JPY", "AUD"),
+      fetchAccountPerQuoteUnit("JPY", "AUD"),
+    ]);
+
+    // One request per leg, not per call.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

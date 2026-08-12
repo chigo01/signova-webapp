@@ -5,8 +5,8 @@
 // type it, we read it off the same public /candles endpoint the chart datafeed
 // uses — one extra 1-bar request per currency, cached for the session.
 //
-// USD-quoted and USD-based pairs never reach here: lib/lot-size.ts resolves
-// those from the entry price alone.
+// Pairs whose quote or base *is* the account currency never reach here:
+// lib/lot-size.ts resolves those from the entry price alone.
 //
 // Requests deliberately aren't cancellable. They're shared between callers, so
 // one caller aborting would resolve the others to null; instead the request
@@ -98,6 +98,65 @@ export async function fetchUsdPerUnit(
 
   inFlight.set(code, request);
   return request;
+}
+
+/**
+ * The cached rate if it is still fresh, else null. Never issues a request — it
+ * lets a caller take a synchronous path when the rate it needs happens to be
+ * warm, which is what keeps switching account currency instant after the first
+ * lookup.
+ */
+export function peekUsdPerUnit(currency: string): number | null {
+  const code = currency.toUpperCase();
+  if (code === "USD") return 1;
+  const cached = cache.get(code);
+  if (!cached || Date.now() - cached.fetchedAt >= CACHE_TTL_MS) return null;
+  return cached.rate;
+}
+
+/** Which side of a conversion the price feed couldn't price. */
+export type MissingRateLeg = "none" | "quote" | "account" | "both";
+
+export interface AccountQuoteRate {
+  /** Account currency per 1 unit of the quote currency, or null if unavailable. */
+  rate: number | null;
+  /** Names the failing leg so the caller can say which currency to fix. */
+  missing: MissingRateLeg;
+}
+
+/**
+ * The rate that converts a trade's P&L into the account currency, composed from
+ * the two USD legs: (USD per quote) / (USD per account).
+ *
+ * Both legs go through fetchUsdPerUnit, so they share its per-currency cache and
+ * in-flight dedupe — deliberately no second cache keyed on the pair, which would
+ * double the staleness surface and escape resetQuoteRateCache().
+ */
+export async function fetchAccountPerQuoteUnit(
+  quoteCurrency: string,
+  accountCurrency: string,
+): Promise<AccountQuoteRate> {
+  const quote = quoteCurrency.toUpperCase();
+  const account = accountCurrency.toUpperCase();
+
+  // Identity is exactly 1. Routing it through two lookups and a division would
+  // make it 1 only up to float luck, and would request a pair like USDUSD.
+  if (quote === account) return { rate: 1, missing: "none" };
+
+  const [usdPerQuote, usdPerAccount] = await Promise.all([
+    fetchUsdPerUnit(quote),
+    fetchUsdPerUnit(account),
+  ]);
+
+  if (usdPerQuote === null && usdPerAccount === null) {
+    return { rate: null, missing: "both" };
+  }
+  if (usdPerQuote === null) return { rate: null, missing: "quote" };
+  if (usdPerAccount === null) return { rate: null, missing: "account" };
+
+  // Divide rather than multiply by a precomputed inverse: for a USD account
+  // usdPerAccount is exactly 1, so this is bit-identical to the raw quote leg.
+  return { rate: usdPerQuote / usdPerAccount, missing: "none" };
 }
 
 /** Test seam — drops cached rates and in-flight requests. */

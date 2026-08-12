@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ChevronDown, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,21 +11,24 @@ import {
   calculateLotSize,
   resolveInstrument,
 } from "@/lib/lot-size";
-import { fetchUsdPerUnit } from "@/lib/quote-rate";
+import {
+  fetchAccountPerQuoteUnit,
+  fetchUsdPerUnit,
+  peekUsdPerUnit,
+  type MissingRateLeg,
+} from "@/lib/quote-rate";
+import {
+  ACCOUNT_CURRENCIES,
+  balanceDecimals,
+  currencySymbol,
+  formatMoney,
+} from "@/lib/account-currency";
 import {
   readLotSizeSettings,
   writeLotSizeSettings,
 } from "@/lib/lot-size-settings";
 
 const RISK_PRESETS = [0.5, 1, 2];
-
-function formatUsd(value: number): string {
-  const formatted = Math.abs(value).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  return `${value < 0 ? "-" : ""}$${formatted}`;
-}
 
 function formatUnits(value: number): string {
   return value.toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -72,7 +75,11 @@ function NumberField({
           inputMode="decimal"
           autoComplete="off"
           placeholder={placeholder}
-          className={cn("h-9 font-mono text-sm tabular-nums", suffix && "pr-9")}
+          className={cn(
+            "h-9 font-mono text-sm tabular-nums",
+            // Code-style symbols ("AED", "CA$") need more room than a glyph.
+            suffix && (suffix.length > 1 ? "pr-12" : "pr-9"),
+          )}
         />
         {suffix && (
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
@@ -83,6 +90,43 @@ function NumberField({
     </div>
   );
 }
+
+/** Native select so the value stays keyboard- and test-addressable by label. */
+function SelectField({
+  id,
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id} className="text-[11px] font-medium text-zinc-400">
+        {label}
+      </Label>
+      <div className="relative">
+        <select
+          id={id}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="flex h-9 w-full appearance-none rounded-md border border-zinc-800 bg-zinc-950 px-3 pr-9 text-sm text-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300"
+        >
+          {children}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+      </div>
+    </div>
+  );
+}
+
+/** A number the user has finished typing. "1." and "" are mid-edit, not values. */
+const SETTLED_NUMBER = /^\d+(\.\d+)?$/;
 
 export interface LotSizeCalculatorModalProps {
   onClose: () => void;
@@ -101,42 +145,66 @@ export function LotSizeCalculatorModal({
   onClose,
   signal,
 }: LotSizeCalculatorModalProps) {
+  // One parse at mount, shared by every seeded field.
+  const [seed] = useState(readLotSizeSettings);
   const [symbol, setSymbol] = useState(
     () =>
       resolveInstrument(signal.pair)?.symbol ?? CALCULATOR_INSTRUMENTS[0].symbol,
   );
-  const [balance, setBalance] = useState(() =>
-    String(readLotSizeSettings().accountBalance),
-  );
-  const [risk, setRisk] = useState(() => String(readLotSizeSettings().riskPercent));
+  const [balance, setBalance] = useState(() => String(seed.accountBalance));
+  const [risk, setRisk] = useState(() => String(seed.riskPercent));
+  const [accountCurrency, setAccountCurrency] = useState(seed.accountCurrency);
   const [entry, setEntry] = useState(() => priceToInput(signal.entryPrice));
   const [stopLoss, setStopLoss] = useState(() =>
     priceToInput(signal.exitTargets?.stopLoss),
   );
-  // Both rate slots carry the currency they belong to, so a result that arrives
-  // after the instrument changed — or an override typed against the old pair —
-  // is ignored rather than silently applied to the wrong currency.
+  // Both rate slots carry the conversion they belong to, so a result that
+  // arrives after the instrument or account currency changed is ignored rather
+  // than silently applied to the wrong pair of currencies.
   const [fetchedRate, setFetchedRate] = useState<{
-    currency: string;
+    key: string;
     rate: number | null;
+    missing: MissingRateLeg;
   } | null>(null);
   const [manualRate, setManualRate] = useState<{
-    currency: string;
+    key: string;
     value: string;
   } | null>(null);
+
+  // The currency the number in the balance box is actually denominated in. It
+  // diverges from accountCurrency only while a conversion is in flight, and
+  // that gap is what makes rapid currency switching compose correctly.
+  const balanceCurrencyRef = useRef(seed.accountCurrency);
+  // Bumped by every switch and every manual balance edit; a conversion that no
+  // longer owns this token drops its result.
+  const switchSeqRef = useRef(0);
+  const [isConverting, setIsConverting] = useState(false);
+  const [conversionFailedFor, setConversionFailedFor] = useState<string | null>(
+    null,
+  );
 
   const balanceValue = Number(balance);
   const riskValue = Number(risk);
 
-  // Persist only plausible values, so mid-typing states ("", "1.") don't stick.
+  // Persist each field independently: a mid-typed balance ("", "1.") must not
+  // block a currency change from sticking, nor clobber the stored balance.
+  // Skipped mid-conversion so a half-converted pair — new currency, old amount —
+  // is never what a reopened calculator reads back.
   useEffect(() => {
-    if (!Number.isFinite(balanceValue) || balanceValue <= 0) return;
-    if (!Number.isFinite(riskValue) || riskValue <= 0) return;
+    if (isConverting) return;
+    const stored = readLotSizeSettings();
     writeLotSizeSettings({
-      accountBalance: balanceValue,
-      riskPercent: riskValue,
+      accountBalance:
+        Number.isFinite(balanceValue) && balanceValue > 0
+          ? balanceValue
+          : stored.accountBalance,
+      riskPercent:
+        Number.isFinite(riskValue) && riskValue > 0
+          ? riskValue
+          : stored.riskPercent,
+      accountCurrency,
     });
-  }, [balanceValue, riskValue]);
+  }, [balanceValue, riskValue, accountCurrency, isConverting]);
 
   // Lock body scroll while the modal is open.
   useEffect(() => {
@@ -159,53 +227,130 @@ export function LotSizeCalculatorModal({
   const instrument =
     CALCULATOR_INSTRUMENTS.find((item) => item.symbol === symbol) ??
     CALCULATOR_INSTRUMENTS[0];
-  // A cross has USD on neither leg, so nothing on the signal converts its risk.
-  const isCross = instrument.base !== "USD" && instrument.quote !== "USD";
-  // Pull the quote currency's USD rate whenever the instrument changes, so
-  // switching EUR/AUD -> GBP/JPY re-resolves the conversion instead of carrying
-  // the previous currency's rate over. Non-crosses need no lookup at all.
+  // A rate is only needed when neither leg of the pair is the account currency;
+  // otherwise lib/lot-size.ts derives it from the entry price for free.
+  const needsRate =
+    instrument.quote !== accountCurrency && instrument.base !== accountCurrency;
+  const rateKey = `${instrument.quote}->${accountCurrency}`;
+
+  // Re-resolve whenever either side of the conversion changes, so switching
+  // EUR/AUD -> GBP/JPY or USD -> JPY never carries the old rate over.
   useEffect(() => {
-    if (!isCross) return;
+    if (!needsRate) return;
 
     let cancelled = false;
-    fetchUsdPerUnit(instrument.quote).then((rate) => {
-      if (!cancelled) setFetchedRate({ currency: instrument.quote, rate });
-    });
+    fetchAccountPerQuoteUnit(instrument.quote, accountCurrency).then(
+      ({ rate, missing }) => {
+        if (!cancelled) setFetchedRate({ key: rateKey, rate, missing });
+      },
+    );
 
     return () => {
       cancelled = true;
     };
-  }, [isCross, instrument.quote]);
+  }, [needsRate, instrument.quote, accountCurrency, rateKey]);
 
-  // Anything belonging to another currency reads as absent, which is what makes
-  // the switch to a new pair show "loading" rather than the old pair's number.
-  const manualForQuote =
-    manualRate?.currency === instrument.quote ? manualRate.value : null;
-  const fetchedForQuote =
-    fetchedRate?.currency === instrument.quote ? fetchedRate : null;
+  // Anything belonging to another conversion reads as absent, which is what
+  // makes a switch show "loading" rather than the previous pair's number.
+  const manualForKey = manualRate?.key === rateKey ? manualRate.value : null;
+  const fetchedForKey = fetchedRate?.key === rateKey ? fetchedRate : null;
 
-  const rateStatus: "idle" | "loading" | "live" | "error" | "manual" = !isCross
+  const rateStatus: "idle" | "loading" | "live" | "error" | "manual" = !needsRate
     ? "idle"
-    : manualForQuote !== null
+    : manualForKey !== null
       ? "manual"
-      : fetchedForQuote === null
+      : fetchedForKey === null
         ? "loading"
-        : fetchedForQuote.rate === null
+        : fetchedForKey.rate === null
           ? "error"
           : "live";
 
   const quoteRate =
-    manualForQuote ??
-    (fetchedForQuote?.rate != null
+    manualForKey ??
+    (fetchedForKey?.rate != null
       ? // Six significant figures keeps JPY-sized rates (0.00636943) precise
         // without printing float noise on EUR-sized ones.
-        String(Number(fetchedForQuote.rate.toPrecision(6)))
+        String(Number(fetchedForKey.rate.toPrecision(6)))
       : "");
+
+  /** Rewrite the balance into `next`, leaving mid-edit text alone. */
+  const applyConversion = useCallback((factor: number, next: string) => {
+    setBalance((current) => {
+      const trimmed = current.trim();
+      if (!SETTLED_NUMBER.test(trimmed)) return current;
+      const amount = Number(trimmed);
+      if (!Number.isFinite(amount) || amount <= 0) return current;
+      // String(Number(...)) drops trailing zeros, so 10000 stays "10000" and a
+      // round trip through another currency comes back textually identical.
+      return String(Number((amount * factor).toFixed(balanceDecimals(next))));
+    });
+    balanceCurrencyRef.current = next;
+  }, []);
+
+  const switchCurrency = useCallback(
+    async (next: string) => {
+      // What the box HOLDS, which is not always what the select shows.
+      const from = balanceCurrencyRef.current;
+      setAccountCurrency(next);
+      setConversionFailedFor(null);
+      const seq = (switchSeqRef.current += 1);
+      // This switch supersedes any in flight, so clear the flag here rather
+      // than in each early return. A superseded handler bails out without
+      // touching it, which would otherwise strand it on forever whenever the
+      // superseding switch resolved synchronously off warm rates.
+      setIsConverting(false);
+
+      // Switched back to whatever the box already holds — nothing to convert,
+      // and notably no rounding, so A -> B -> A is exactly lossless.
+      if (from === next) return;
+
+      // Warm rates convert synchronously, which leaves no window for a race.
+      const warmFrom = peekUsdPerUnit(from);
+      const warmNext = peekUsdPerUnit(next);
+      if (warmFrom !== null && warmNext !== null) {
+        applyConversion(warmFrom / warmNext, next);
+        return;
+      }
+
+      setIsConverting(true);
+      const [usdPerFrom, usdPerNext] = await Promise.all([
+        fetchUsdPerUnit(from),
+        fetchUsdPerUnit(next),
+      ]);
+      // A newer switch or a manual edit owns the box now; drop this result.
+      if (switchSeqRef.current !== seq) return;
+      setIsConverting(false);
+
+      if (usdPerFrom === null || usdPerNext === null) {
+        // Keep the number and keep the new currency — reverting the select
+        // would fight the user, and converting at a guess would be worse. The
+        // notice below the field is what stops it being a silent relabel.
+        setConversionFailedFor(next);
+        balanceCurrencyRef.current = next;
+        return;
+      }
+      applyConversion(usdPerFrom / usdPerNext, next);
+    },
+    [applyConversion],
+  );
+
+  /** A number the user types is denominated in whatever the select shows. */
+  const handleBalanceChange = useCallback(
+    (value: string) => {
+      switchSeqRef.current += 1;
+      balanceCurrencyRef.current = accountCurrency;
+      setIsConverting(false);
+      setConversionFailedFor(null);
+      setBalance(value);
+    },
+    [accountCurrency],
+  );
 
   const result = useMemo(
     () =>
       calculateLotSize({
         instrument,
+        accountCurrency,
         accountBalance: balanceValue,
         riskPercent: riskValue,
         entryPrice: Number(entry),
@@ -214,7 +359,7 @@ export function LotSizeCalculatorModal({
         takeProfit1: signal.exitTargets?.takeProfit1,
         takeProfit2: signal.exitTargets?.takeProfit2,
         quoteRateOverride:
-          isCross && quoteRate ? Number(quoteRate) : undefined,
+          needsRate && quoteRate ? Number(quoteRate) : undefined,
         quoteRateOrigin: rateStatus === "manual" ? "manual" : "live",
       }),
     [
@@ -226,7 +371,8 @@ export function LotSizeCalculatorModal({
       signal.direction,
       signal.exitTargets?.takeProfit1,
       signal.exitTargets?.takeProfit2,
-      isCross,
+      accountCurrency,
+      needsRate,
       quoteRate,
       rateStatus,
     ],
@@ -270,28 +416,31 @@ export function LotSizeCalculatorModal({
         </div>
 
         <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label
-              htmlFor="lot-size-instrument"
-              className="text-[11px] font-medium text-zinc-400"
+          <div className="grid grid-cols-2 gap-3">
+            <SelectField
+              id="lot-size-instrument"
+              label="Instrument"
+              value={instrument.symbol}
+              onChange={setSymbol}
             >
-              Instrument
-            </Label>
-            <div className="relative">
-              <select
-                id="lot-size-instrument"
-                value={instrument.symbol}
-                onChange={(event) => setSymbol(event.target.value)}
-                className="flex h-9 w-full appearance-none rounded-md border border-zinc-800 bg-zinc-950 px-3 pr-9 text-sm text-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300"
-              >
-                {CALCULATOR_INSTRUMENTS.map((item) => (
-                  <option key={item.symbol} value={item.symbol}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-            </div>
+              {CALCULATOR_INSTRUMENTS.map((item) => (
+                <option key={item.symbol} value={item.symbol}>
+                  {item.label}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField
+              id="lot-size-account-currency"
+              label="Account currency"
+              value={accountCurrency}
+              onChange={switchCurrency}
+            >
+              {ACCOUNT_CURRENCIES.map((item) => (
+                <option key={item.code} value={item.code} title={item.name}>
+                  {item.code}
+                </option>
+              ))}
+            </SelectField>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -299,8 +448,8 @@ export function LotSizeCalculatorModal({
               id="lot-size-balance"
               label="Account balance"
               value={balance}
-              onChange={setBalance}
-              suffix="$"
+              onChange={handleBalanceChange}
+              suffix={currencySymbol(accountCurrency)}
             />
             <NumberField
               id="lot-size-risk"
@@ -310,6 +459,13 @@ export function LotSizeCalculatorModal({
               suffix="%"
             />
           </div>
+
+          {conversionFailedFor && (
+            <p className="text-[10px] leading-relaxed text-amber-400/90">
+              Couldn&apos;t convert your balance to {conversionFailedFor} — the
+              rate wasn&apos;t available. Check the amount.
+            </p>
+          )}
 
           <div className="flex gap-1.5">
             {RISK_PRESETS.map((preset) => (
@@ -346,15 +502,13 @@ export function LotSizeCalculatorModal({
             />
           </div>
 
-          {isCross && (
+          {needsRate && (
             <div className="space-y-1">
               <NumberField
                 id="lot-size-quote-rate"
-                label={`USD per 1 ${instrument.quote}`}
+                label={`${accountCurrency} per 1 ${instrument.quote}`}
                 value={quoteRate}
-                onChange={(value) =>
-                  setManualRate({ currency: instrument.quote, value })
-                }
+                onChange={(value) => setManualRate({ key: rateKey, value })}
                 placeholder={
                   rateStatus === "loading" ? "Loading rate…" : undefined
                 }
@@ -377,9 +531,13 @@ export function LotSizeCalculatorModal({
                     </button>
                   </>
                 ) : rateStatus === "loading" ? (
-                  `Fetching the live ${instrument.quote} rate…`
+                  `Fetching the live ${instrument.quote}/${accountCurrency} rate…`
                 ) : rateStatus === "live" ? (
                   "Live rate — edit to override."
+                ) : // Name the leg that failed: for a crypto or exotic account
+                // it's the account currency, not the pair, that can't be priced.
+                fetchedForKey?.missing === "account" ? (
+                  `Couldn't price ${accountCurrency}. Enter how much ${accountCurrency} 1 ${instrument.quote} is worth.`
                 ) : (
                   `Couldn't load the ${instrument.quote} rate. Enter it manually.`
                 )}
@@ -388,7 +546,15 @@ export function LotSizeCalculatorModal({
           )}
         </div>
 
-        {result.error ? (
+        {/* A rate still in flight is not a failure. Without this the panel would
+            flash a full error on every open for any pair needing a lookup. */}
+        {isConverting || (needsRate && rateStatus === "loading") ? (
+          <p className="mt-4 rounded-lg border border-zinc-800/80 bg-zinc-900/50 px-3 py-3 text-center text-xs text-zinc-500">
+            {isConverting
+              ? `Converting your balance to ${accountCurrency}…`
+              : `Loading the ${instrument.quote}/${accountCurrency} rate…`}
+          </p>
+        ) : result.error ? (
           <p className="mt-4 rounded-lg border border-[#F63B6B]/30 bg-[#F63B6B]/10 px-3 py-2.5 text-xs text-red-300">
             {result.error}
           </p>
@@ -410,7 +576,7 @@ export function LotSizeCalculatorModal({
             <div className="space-y-2 rounded-lg border border-zinc-800/80 bg-zinc-900/50 px-3 py-2.5">
               <ResultRow
                 label="Risk at this size"
-                value={`${formatUsd(result.actualRisk)} of ${formatUsd(result.riskAmount)}`}
+                value={`${formatMoney(result.actualRisk, accountCurrency)} of ${formatMoney(result.riskAmount, accountCurrency)}`}
               />
               <ResultRow
                 label="Stop distance"
@@ -418,13 +584,13 @@ export function LotSizeCalculatorModal({
               />
               <ResultRow
                 label="Value per pip"
-                value={formatUsd(result.valuePerPip)}
+                value={formatMoney(result.valuePerPip, accountCurrency)}
               />
               {result.targets.map((target) => (
                 <ResultRow
                   key={target.label}
                   label={`${target.label} at ${target.price}`}
-                  value={`${formatUsd(target.profit)} · ${target.rMultiple.toFixed(2)}R`}
+                  value={`${formatMoney(target.profit, accountCurrency)} · ${target.rMultiple.toFixed(2)}R`}
                 />
               ))}
             </div>
@@ -446,7 +612,7 @@ export function LotSizeCalculatorModal({
         )}
 
         <p className="mt-4 border-t border-zinc-800/80 pt-3 text-[10px] leading-relaxed text-zinc-600">
-          Assumes a USD account and standard contract sizes (
+          Sized for a {accountCurrency} account using standard contract sizes (
           {formatUnits(instrument.contractSize)} {instrument.base} per lot).
           Contract specs and minimum lot steps vary by broker — verify before
           trading.

@@ -7,7 +7,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LotSizeCalculatorModal } from "./lot-size-calculator-modal";
-import { resetQuoteRateCache } from "@/lib/quote-rate";
+import { fetchUsdPerUnit, resetQuoteRateCache } from "@/lib/quote-rate";
 import { Signal } from "@/types/signal";
 
 /**
@@ -72,6 +72,11 @@ function field(label: string | RegExp): HTMLInputElement {
   return screen.getByLabelText(label) as HTMLInputElement;
 }
 
+function storedSettings() {
+  const raw = window.localStorage.getItem("signova_lot_size_settings");
+  return raw === null ? null : JSON.parse(raw);
+}
+
 describe("LotSizeCalculatorModal", () => {
   it("prefills from the signal and sizes the position", () => {
     render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
@@ -106,9 +111,11 @@ describe("LotSizeCalculatorModal", () => {
     fireEvent.change(field("Risk"), { target: { value: "2" } });
 
     expect(screen.getByText("0.66")).toBeInTheDocument();
-    expect(window.localStorage.getItem("signova_lot_size_settings")).toBe(
-      JSON.stringify({ accountBalance: 10000, riskPercent: 2 }),
-    );
+    expect(storedSettings()).toEqual({
+      accountBalance: 10000,
+      riskPercent: 2,
+      accountCurrency: "USD",
+    });
   });
 
   it("reuses a balance stored by another card's calculator", () => {
@@ -217,11 +224,14 @@ describe("LotSizeCalculatorModal", () => {
         screen.getByText("Couldn't load the JPY rate. Enter it manually."),
       ).toBeInTheDocument(),
     );
-    expect(screen.getByText(/cross pair/)).toBeInTheDocument();
+    // No rate means no number at all — sizing on the fallback of 1 is refused.
+    expect(screen.getByText(/couldn't be loaded/)).toBeInTheDocument();
+    expect(screen.queryByText("Lot size")).not.toBeInTheDocument();
 
     fireEvent.change(field("USD per 1 JPY"), { target: { value: "0.0064" } });
 
-    expect(screen.queryByText(/cross pair/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/couldn't be loaded/)).not.toBeInTheDocument();
+    expect(screen.getByText("Lot size")).toBeInTheDocument();
   });
 
   it("derives the rate itself for a USD-based pair, with no rate field", () => {
@@ -252,9 +262,11 @@ describe("LotSizeCalculatorModal", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("Lot size")).not.toBeInTheDocument();
     // An unusable balance must not overwrite the stored one.
-    expect(window.localStorage.getItem("signova_lot_size_settings")).toBe(
-      JSON.stringify({ accountBalance: 10000, riskPercent: 1 }),
-    );
+    expect(storedSettings()).toEqual({
+      accountBalance: 10000,
+      riskPercent: 1,
+      accountCurrency: "USD",
+    });
   });
 
   it("warns when the account is too small to place the trade", () => {
@@ -274,5 +286,251 @@ describe("LotSizeCalculatorModal", () => {
 
     fireEvent.click(screen.getByLabelText("Close"));
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  describe("account currency", () => {
+    const currency = () =>
+      screen.getByLabelText("Account currency") as HTMLSelectElement;
+
+    function selectCurrency(code: string) {
+      fireEvent.change(currency(), { target: { value: code } });
+    }
+
+    function storeCurrency(code: string) {
+      window.localStorage.setItem(
+        "signova_lot_size_settings",
+        JSON.stringify({
+          accountBalance: 10000,
+          riskPercent: 1,
+          accountCurrency: code,
+        }),
+      );
+    }
+
+    it("defaults to USD and seeds from storage", () => {
+      render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
+      expect(currency().value).toBe("USD");
+
+      cleanup();
+      storeCurrency("JPY");
+      render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
+      expect(currency().value).toBe("JPY");
+    });
+
+    it("converts the balance and relabels every figure", async () => {
+      stubCandles({ AUDUSD: 0.70559 });
+      render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
+
+      selectCurrency("AUD");
+
+      // 10,000 USD / 0.70559 = 14,172.54 AUD.
+      await waitFor(() =>
+        expect(field("Account balance").value).toBe("14172.54"),
+      );
+      expect(screen.getByText("A$")).toBeInTheDocument();
+      expect(screen.getByText(/Sized for a AUD account/)).toBeInTheDocument();
+      // EUR/USD against an AUD account now needs a USD->AUD rate.
+      expect(screen.getByLabelText("AUD per 1 USD")).toBeInTheDocument();
+    });
+
+    it("drops the decimals a JPY balance can't have", async () => {
+      stubCandles({ JPYUSD: 0.006278 });
+      render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
+
+      selectCurrency("JPY");
+
+      await waitFor(() => expect(field("Account balance").value).toBe("1592864"));
+      expect(field("Account balance").value).not.toContain(".");
+    });
+
+    it("round trips back to the original amount, losslessly", async () => {
+      stubCandles({ AUDUSD: 0.70559 });
+      render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
+
+      selectCurrency("AUD");
+      await waitFor(() =>
+        expect(field("Account balance").value).toBe("14172.54"),
+      );
+
+      selectCurrency("USD");
+
+      // Returning to the currency the box already held converts nothing at all,
+      // so not even a rounding cent is lost.
+      await waitFor(() => expect(field("Account balance").value).toBe("10000"));
+      expect(storedSettings()).toEqual({
+        accountBalance: 10000,
+        riskPercent: 1,
+        accountCurrency: "USD",
+      });
+    });
+
+    it("leaves a half-typed balance alone", async () => {
+      stubCandles({ AUDUSD: 0.70559 });
+      render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
+
+      fireEvent.change(field("Account balance"), { target: { value: "1." } });
+      selectCurrency("AUD");
+
+      await waitFor(() => expect(currency().value).toBe("AUD"));
+      expect(field("Account balance").value).toBe("1.");
+    });
+
+    it("persists a currency change even while the balance is unusable", async () => {
+      stubCandles({ GBPUSD: 1.35077 });
+      render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
+
+      fireEvent.change(field("Account balance"), { target: { value: "" } });
+      selectCurrency("GBP");
+
+      // The old persist effect bailed out whenever the balance was unusable,
+      // which silently dropped the currency choice.
+      await waitFor(() =>
+        expect(storedSettings()).toEqual({
+          accountBalance: 10000,
+          riskPercent: 1,
+          accountCurrency: "GBP",
+        }),
+      );
+    });
+
+    it("composes the rate from both legs when neither is USD", async () => {
+      storeCurrency("GBP");
+      stubCandles({ JPYUSD: 0.0063694, GBPUSD: 1.35077 });
+      render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
+
+      fireEvent.change(screen.getByLabelText("Instrument"), {
+        target: { value: "EURJPY" },
+      });
+
+      // (USD per JPY) / (USD per GBP) = 0.0063694 / 1.35077.
+      await waitFor(() =>
+        expect(field("GBP per 1 JPY").value).toBe("0.00471538"),
+      );
+      expect(screen.queryByText(/couldn't be loaded/)).not.toBeInTheDocument();
+    });
+
+    it("says which leg failed when the account currency is the unpriceable one", async () => {
+      // The pair prices fine; BTC is what the feed can't value.
+      stubCandles({ JPYUSD: 0.0063694 });
+      render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
+
+      fireEvent.change(screen.getByLabelText("Instrument"), {
+        target: { value: "EURJPY" },
+      });
+      selectCurrency("BTC");
+
+      await waitFor(() =>
+        expect(
+          screen.getByText(
+            "Couldn't price BTC. Enter how much BTC 1 JPY is worth.",
+          ),
+        ).toBeInTheDocument(),
+      );
+    });
+
+    /**
+     * Like stubCandles, but each symbol's response is held open until released,
+     * so a conversion can be left in flight while the user acts again.
+     */
+    function stubDeferredCandles(closes: Record<string, number>) {
+      const gates = new Map<string, () => void>();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          const symbol = new URL(url, "http://localhost").searchParams.get(
+            "pair",
+          )!;
+          await new Promise<void>((resolve) => gates.set(symbol, resolve));
+          const close = closes[symbol];
+          return {
+            ok: true,
+            json: async () =>
+              close === undefined
+                ? { bars: [], noData: true }
+                : { bars: [{ close }], noData: false },
+          } as Response;
+        }),
+      );
+      return {
+        release: async (symbol: string) => {
+          await waitFor(() => expect(gates.has(symbol)).toBe(true));
+          gates.get(symbol)!();
+        },
+      };
+    }
+
+    it("switching twice quickly converts from the amount actually held", async () => {
+      // The trap: after the first switch the select reads AUD while the box
+      // still holds a USD amount. Converting AUD->JPY there would be wrong by
+      // the AUD/USD rate.
+      const gate = stubDeferredCandles({ AUDUSD: 0.70559, JPYUSD: 0.006278 });
+      render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
+
+      selectCurrency("AUD");
+      await waitFor(() => expect(currency().value).toBe("AUD"));
+      selectCurrency("JPY");
+
+      await gate.release("AUDUSD");
+      await gate.release("JPYUSD");
+
+      // 10,000 USD -> JPY directly, not routed through the abandoned AUD hop.
+      await waitFor(() =>
+        expect(field("Account balance").value).toBe("1592864"),
+      );
+      expect(currency().value).toBe("JPY");
+    });
+
+    it("recovers when a pending switch is superseded by a warm one", async () => {
+      // Warm JPY first so the second switch resolves synchronously while the
+      // first is still in flight — the ordering that used to strand the panel
+      // on "Converting…" forever.
+      stubCandles({ JPYUSD: 0.006278 });
+      await fetchUsdPerUnit("JPY");
+
+      const gate = stubDeferredCandles({ AUDUSD: 0.70559 });
+      render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
+
+      selectCurrency("AUD");
+      await waitFor(() => expect(currency().value).toBe("AUD"));
+      selectCurrency("JPY");
+
+      await waitFor(() =>
+        expect(field("Account balance").value).toBe("1592864"),
+      );
+      expect(screen.queryByText(/Converting your balance/)).not.toBeInTheDocument();
+
+      // The abandoned AUD lookup must not resurrect the converting state.
+      await gate.release("AUDUSD");
+      await waitFor(() => expect(screen.getByText("Lot size")).toBeInTheDocument());
+      expect(storedSettings().accountCurrency).toBe("JPY");
+    });
+
+    it("typing a balance cancels a conversion already in flight", async () => {
+      const gate = stubDeferredCandles({ AUDUSD: 0.70559 });
+      render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
+
+      selectCurrency("AUD");
+      await waitFor(() => expect(currency().value).toBe("AUD"));
+      fireEvent.change(field("Account balance"), { target: { value: "500" } });
+
+      await gate.release("AUDUSD");
+
+      // The typed number is already in AUD, so the pending result is discarded.
+      await waitFor(() => expect(field("Account balance").value).toBe("500"));
+    });
+
+    it("warns rather than silently relabelling when the balance can't convert", async () => {
+      stubCandles({});
+      render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
+
+      selectCurrency("AED");
+
+      await waitFor(() =>
+        expect(screen.getByText(/Couldn't convert your balance to AED/)).
+          toBeInTheDocument(),
+      );
+      expect(field("Account balance").value).toBe("10000");
+      expect(currency().value).toBe("AED");
+    });
   });
 });

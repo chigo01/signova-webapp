@@ -27,11 +27,16 @@ afterEach(() => {
 });
 
 describe("lot size settings", () => {
-  it("round trips balance and risk so they're typed once per device", () => {
-    writeLotSizeSettings({ accountBalance: 25_000, riskPercent: 0.5 });
+  it("round trips balance, risk and currency so they're typed once per device", () => {
+    writeLotSizeSettings({
+      accountBalance: 25_000,
+      riskPercent: 0.5,
+      accountCurrency: "JPY",
+    });
     expect(readLotSizeSettings()).toEqual({
       accountBalance: 25_000,
       riskPercent: 0.5,
+      accountCurrency: "JPY",
     });
   });
 
@@ -57,6 +62,34 @@ describe("lot size settings", () => {
     expect(readLotSizeSettings()).toEqual({
       accountBalance: 25_000,
       riskPercent: DEFAULT_LOT_SIZE_SETTINGS.riskPercent,
+      accountCurrency: DEFAULT_LOT_SIZE_SETTINGS.accountCurrency,
     });
+  });
+
+  it("upgrades a payload stored before currencies existed", () => {
+    window.localStorage.setItem(
+      "signova_lot_size_settings",
+      '{"accountBalance":25000,"riskPercent":2}',
+    );
+    expect(readLotSizeSettings()).toEqual({
+      accountBalance: 25_000,
+      riskPercent: 2,
+      accountCurrency: "USD",
+    });
+  });
+
+  it.each([
+    ['"XAU"', "a currency we can't price"],
+    ['"usd"', "the right code in the wrong case"],
+    ["42", "a non-string"],
+    ["null", "an explicit null"],
+  ])("rejects %s as a currency (%s)", (raw) => {
+    window.localStorage.setItem(
+      "signova_lot_size_settings",
+      `{"accountBalance":25000,"riskPercent":2,"accountCurrency":${raw}}`,
+    );
+    expect(readLotSizeSettings().accountCurrency).toBe("USD");
+    // A bad currency must not discard the rest of the payload.
+    expect(readLotSizeSettings().accountBalance).toBe(25_000);
   });
 });
