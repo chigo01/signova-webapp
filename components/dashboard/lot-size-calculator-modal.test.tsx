@@ -278,7 +278,9 @@ describe("LotSizeCalculatorModal", () => {
 
     fireEvent.change(field("Account balance"), { target: { value: "200" } });
 
-    expect(screen.getByText(/below the 0.01 minimum/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/below the broker minimum of 0.01/),
+    ).toBeInTheDocument();
   });
 
   it("closes on Escape and on the close button", () => {

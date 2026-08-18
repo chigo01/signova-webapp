@@ -33,6 +33,8 @@ describe("lot size settings", () => {
       riskPercent: 0.5,
       accountCurrency: "JPY",
       costBufferPercent: 10,
+      minimumLotSize: 0.1,
+      maximumLotSize: 50,
       lotStep: 0.001,
     });
     expect(readLotSizeSettings()).toEqual({
@@ -40,6 +42,8 @@ describe("lot size settings", () => {
       riskPercent: 0.5,
       accountCurrency: "JPY",
       costBufferPercent: 10,
+      minimumLotSize: 0.1,
+      maximumLotSize: 50,
       lotStep: 0.001,
     });
   });
@@ -68,6 +72,8 @@ describe("lot size settings", () => {
       riskPercent: DEFAULT_LOT_SIZE_SETTINGS.riskPercent,
       accountCurrency: DEFAULT_LOT_SIZE_SETTINGS.accountCurrency,
       costBufferPercent: DEFAULT_LOT_SIZE_SETTINGS.costBufferPercent,
+      minimumLotSize: DEFAULT_LOT_SIZE_SETTINGS.minimumLotSize,
+      maximumLotSize: DEFAULT_LOT_SIZE_SETTINGS.maximumLotSize,
       lotStep: DEFAULT_LOT_SIZE_SETTINGS.lotStep,
     });
   });
@@ -82,6 +88,8 @@ describe("lot size settings", () => {
       riskPercent: 2,
       accountCurrency: "USD",
       costBufferPercent: 0,
+      minimumLotSize: 0.01,
+      maximumLotSize: undefined,
       lotStep: 0.01,
     });
   });

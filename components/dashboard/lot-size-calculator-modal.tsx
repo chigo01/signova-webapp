@@ -28,7 +28,7 @@ import {
   writeLotSizeSettings,
 } from "@/lib/lot-size-settings";
 
-const RISK_PRESETS = [0.5, 1, 2];
+const RISK_PRESETS = [1, 5, 10];
 
 function formatUnits(value: number): string {
   return value.toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -166,6 +166,12 @@ export function LotSizeCalculatorModal({
   const [pipSize, setPipSize] = useState(() =>
     String(initialInstrument.pipSize),
   );
+  const [minimumLotSize, setMinimumLotSize] = useState(() =>
+    String(seed.minimumLotSize),
+  );
+  const [maximumLotSize, setMaximumLotSize] = useState(() =>
+    seed.maximumLotSize === undefined ? "" : String(seed.maximumLotSize),
+  );
   const [lotStep, setLotStep] = useState(() => String(seed.lotStep));
   const [costBuffer, setCostBuffer] = useState(() =>
     String(seed.costBufferPercent),
@@ -197,6 +203,10 @@ export function LotSizeCalculatorModal({
 
   const balanceValue = Number(balance);
   const riskValue = Number(risk);
+  const minimumLotSizeValue = Number(minimumLotSize);
+  const maximumLotSizeValue = maximumLotSize.trim()
+    ? Number(maximumLotSize)
+    : undefined;
   const lotStepValue = Number(lotStep);
   const costBufferValue = Number(costBuffer);
 
@@ -221,6 +231,15 @@ export function LotSizeCalculatorModal({
         Number.isFinite(costBufferValue) && costBufferValue >= 0
           ? costBufferValue
           : stored.costBufferPercent,
+      minimumLotSize:
+        Number.isFinite(minimumLotSizeValue) && minimumLotSizeValue > 0
+          ? minimumLotSizeValue
+          : stored.minimumLotSize,
+      maximumLotSize:
+        maximumLotSizeValue === undefined ||
+        (Number.isFinite(maximumLotSizeValue) && maximumLotSizeValue > 0)
+          ? maximumLotSizeValue
+          : stored.maximumLotSize,
       lotStep:
         Number.isFinite(lotStepValue) && lotStepValue > 0
           ? lotStepValue
@@ -231,6 +250,8 @@ export function LotSizeCalculatorModal({
     riskValue,
     accountCurrency,
     costBufferValue,
+    minimumLotSizeValue,
+    maximumLotSizeValue,
     lotStepValue,
     isConverting,
   ]);
@@ -404,6 +425,8 @@ export function LotSizeCalculatorModal({
         quoteRateOrigin: rateStatus === "manual" ? "manual" : "live",
         contractSizeOverride: Number(contractSize),
         pipSizeOverride: Number(pipSize),
+        minimumLotSize: minimumLotSizeValue,
+        maximumLotSize: maximumLotSizeValue,
         lotStep: lotStepValue,
         costBufferPercent: costBufferValue,
       }),
@@ -422,6 +445,8 @@ export function LotSizeCalculatorModal({
       rateStatus,
       contractSize,
       pipSize,
+      minimumLotSizeValue,
+      maximumLotSizeValue,
       lotStepValue,
       costBufferValue,
     ],
@@ -615,8 +640,21 @@ export function LotSizeCalculatorModal({
                 onChange={setPipSize}
               />
               <NumberField
+                id="lot-size-minimum-lot"
+                label="Minimum lot size"
+                value={minimumLotSize}
+                onChange={setMinimumLotSize}
+              />
+              <NumberField
+                id="lot-size-maximum-lot"
+                label="Maximum lot size"
+                value={maximumLotSize}
+                onChange={setMaximumLotSize}
+                placeholder="Optional"
+              />
+              <NumberField
                 id="lot-size-lot-step"
-                label="Minimum lot step"
+                label="Lot step"
                 value={lotStep}
                 onChange={setLotStep}
               />
@@ -660,8 +698,8 @@ export function LotSizeCalculatorModal({
 
             <div className="space-y-2 rounded-lg border border-zinc-800/80 bg-zinc-900/50 px-3 py-2.5">
               <ResultRow
-                label="Risk at this size"
-                value={`${formatMoney(result.actualRisk, accountCurrency)} of ${formatMoney(result.riskAmount, accountCurrency)}`}
+                label="Risk amount"
+                value={formatMoney(result.riskAmount, accountCurrency)}
               />
               {result.costAllowance > 0 && (
                 <ResultRow
@@ -669,6 +707,10 @@ export function LotSizeCalculatorModal({
                   value={formatMoney(result.costAllowance, accountCurrency)}
                 />
               )}
+              <ResultRow
+                label="Estimated loss at SL"
+                value={formatMoney(result.actualRisk, accountCurrency)}
+              />
               <ResultRow
                 label="Stop distance"
                 value={`${result.stopPips.toFixed(1)} pips`}
@@ -704,8 +746,9 @@ export function LotSizeCalculatorModal({
 
         <p className="mt-4 border-t border-zinc-800/80 pt-3 text-[10px] leading-relaxed text-zinc-600">
           Uses {formatUnits(result.contractSize)} {instrument.base} per lot, pip
-          size {result.pipSize}, and lot step {result.lotStep}. The buffer
-          reserves risk capacity; it does not estimate actual spread,
+          size {result.pipSize}, broker minimum {result.minimumLotSize}, maximum{" "}
+          {result.maximumLotSize ?? "not set"}, and lot step {result.lotStep}.
+          The buffer reserves risk capacity; it does not estimate actual spread,
           commission, slippage, or gaps.
         </p>
       </div>

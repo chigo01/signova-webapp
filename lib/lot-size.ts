@@ -167,6 +167,8 @@ export interface LotSizeInput {
   /** Broker-specific overrides. Defaults retain the standard instrument spec. */
   contractSizeOverride?: number;
   pipSizeOverride?: number;
+  minimumLotSize?: number;
+  maximumLotSize?: number;
   lotStep?: number;
   /** Percentage of the risk amount reserved for spread/commission/slippage. */
   costBufferPercent?: number;
@@ -189,7 +191,7 @@ export interface LotSizeResult {
   riskPerLot: number;
   /** Unrounded position size. */
   lots: number;
-  /** Position size floored to the 0.01 lot step — never rounds risk upward. */
+  /** Position size capped to broker limits and floored to the lot step. */
   roundedLots: number;
   units: number;
   /** Account currency per pip at roundedLots. */
@@ -200,6 +202,8 @@ export interface LotSizeResult {
   costAllowance: number;
   contractSize: number;
   pipSize: number;
+  minimumLotSize: number;
+  maximumLotSize?: number;
   lotStep: number;
   targets: LotSizeTarget[];
 }
@@ -224,6 +228,8 @@ function failure(error: string, quoteRate = 1): LotSizeResult {
     costAllowance: 0,
     contractSize: 0,
     pipSize: 0,
+    minimumLotSize: 0,
+    maximumLotSize: undefined,
     lotStep: 0,
     targets: [],
   };
@@ -301,6 +307,8 @@ export function calculateLotSize(input: LotSizeInput): LotSizeResult {
     quoteRateOrigin = "manual",
     contractSizeOverride,
     pipSizeOverride,
+    minimumLotSize = MIN_LOT_STEP,
+    maximumLotSize,
     lotStep = MIN_LOT_STEP,
     costBufferPercent = 0,
   } = input;
@@ -330,6 +338,23 @@ export function calculateLotSize(input: LotSizeInput): LotSizeResult {
   }
   if (!Number.isFinite(pipSize) || pipSize <= 0) {
     return failure("Enter a pip size greater than 0.");
+  }
+  if (!Number.isFinite(minimumLotSize) || minimumLotSize <= 0) {
+    return failure("Enter a minimum lot size greater than 0.");
+  }
+  if (
+    maximumLotSize !== undefined &&
+    (!Number.isFinite(maximumLotSize) || maximumLotSize <= 0)
+  ) {
+    return failure(
+      "Enter a maximum lot size greater than 0, or leave it blank.",
+    );
+  }
+  if (
+    maximumLotSize !== undefined &&
+    maximumLotSize < minimumLotSize
+  ) {
+    return failure("Maximum lot size must be at least the minimum lot size.");
   }
   if (!Number.isFinite(lotStep) || lotStep <= 0) {
     return failure("Enter a lot step greater than 0.");
@@ -392,11 +417,19 @@ export function calculateLotSize(input: LotSizeInput): LotSizeResult {
   const tradeRiskBudget = riskAmount - costAllowance;
   const riskPerLot = stopDistance * contractSize * quoteRate;
   const lots = tradeRiskBudget / riskPerLot;
-  const roundedLots = floorToLotStep(lots, lotStep);
+  const brokerLimitedLots =
+    maximumLotSize === undefined ? lots : Math.min(lots, maximumLotSize);
+  let roundedLots = floorToLotStep(brokerLimitedLots, lotStep);
 
-  if (roundedLots < lotStep) {
+  if (roundedLots < minimumLotSize) {
+    roundedLots = 0;
     warnings.push(
-      `This works out to ${lots.toFixed(4)} lots — below the ${lotStep} minimum. Increase the balance or risk %, or tighten the stop.`,
+      `This works out to ${lots.toFixed(4)} lots — below the broker minimum of ${minimumLotSize}. No position is recommended because using the minimum would exceed your risk limit.`,
+    );
+  }
+  if (maximumLotSize !== undefined && lots > maximumLotSize) {
+    warnings.push(
+      `The risk-based size is ${lots.toFixed(4)} lots, so it was capped at the broker maximum of ${maximumLotSize}.`,
     );
   }
 
@@ -432,6 +465,8 @@ export function calculateLotSize(input: LotSizeInput): LotSizeResult {
     costAllowance,
     contractSize,
     pipSize,
+    minimumLotSize,
+    maximumLotSize,
     lotStep,
     targets,
   };

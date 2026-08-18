@@ -403,7 +403,9 @@ describe("calculateLotSize", () => {
     expect(result.roundedLots).toBe(0);
     expect(result.units).toBe(0);
     expect(result.actualRisk).toBe(0);
-    expect(result.warnings.join(" ")).toContain("below the 0.01 minimum");
+    expect(result.warnings.join(" ")).toContain(
+      "below the broker minimum of 0.01",
+    );
   });
 
   it("supports broker specs, lot steps and a trading-cost buffer", () => {

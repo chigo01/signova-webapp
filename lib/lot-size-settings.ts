@@ -19,6 +19,8 @@ export interface LotSizeSettings {
   /** ISO code from ACCOUNT_CURRENCIES. Unknown or absent reads as USD. */
   accountCurrency: string;
   costBufferPercent: number;
+  minimumLotSize: number;
+  maximumLotSize?: number;
   lotStep: number;
 }
 
@@ -27,6 +29,8 @@ export const DEFAULT_LOT_SIZE_SETTINGS: LotSizeSettings = {
   riskPercent: 1,
   accountCurrency: DEFAULT_ACCOUNT_CURRENCY,
   costBufferPercent: 0,
+  minimumLotSize: 0.01,
+  maximumLotSize: undefined,
   lotStep: 0.01,
 };
 
@@ -39,6 +43,8 @@ export function readLotSizeSettings(): LotSizeSettings {
     const accountBalance = Number(parsed?.accountBalance);
     const riskPercent = Number(parsed?.riskPercent);
     const costBufferPercent = Number(parsed?.costBufferPercent);
+    const minimumLotSize = Number(parsed?.minimumLotSize);
+    const maximumLotSize = Number(parsed?.maximumLotSize);
     const lotStep = Number(parsed?.lotStep);
     return {
       accountBalance:
@@ -60,6 +66,16 @@ export function readLotSizeSettings(): LotSizeSettings {
         costBufferPercent < 100
           ? costBufferPercent
           : DEFAULT_LOT_SIZE_SETTINGS.costBufferPercent,
+      minimumLotSize:
+        Number.isFinite(minimumLotSize) && minimumLotSize > 0
+          ? minimumLotSize
+          : DEFAULT_LOT_SIZE_SETTINGS.minimumLotSize,
+      maximumLotSize:
+        parsed?.maximumLotSize !== undefined &&
+        Number.isFinite(maximumLotSize) &&
+        maximumLotSize > 0
+          ? maximumLotSize
+          : DEFAULT_LOT_SIZE_SETTINGS.maximumLotSize,
       lotStep:
         Number.isFinite(lotStep) && lotStep > 0
           ? lotStep
