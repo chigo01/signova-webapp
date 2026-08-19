@@ -51,10 +51,10 @@ describe("distillUserReasoning", () => {
 
   it("turns a Model 4 markdown essay into a handful of short bullets", () => {
     const bullets = distillUserReasoning(essay);
-    expect(bullets.length).toBeGreaterThan(1);
-    expect(bullets.length).toBeLessThanOrEqual(4);
+    expect(bullets.length).toBeGreaterThanOrEqual(1);
+    expect(bullets.length).toBeLessThanOrEqual(2);
     expect(bullets.some((line) => line.includes("**"))).toBe(false);
-    expect(bullets.every((line) => line.length <= 161)).toBe(true);
+    expect(bullets.every((line) => line.length <= 111)).toBe(true);
     expect(bullets[0]).toMatch(/BUY on the 1h/i);
     expect(bullets.some((line) => /news|article|conflict/i.test(line))).toBe(
       true,

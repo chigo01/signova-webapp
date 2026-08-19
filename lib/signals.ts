@@ -48,8 +48,8 @@ const fallbackSupportResistance: Signal["supportResistance"] = {
   currentLevel: "neutral",
 };
 
-const USER_REASONING_MAX_BULLETS = 4;
-const USER_REASONING_MAX_CHARS = 160;
+const USER_REASONING_MAX_BULLETS = 2;
+const USER_REASONING_MAX_CHARS = 110;
 
 function stripInsightMarkdown(text: string): string {
   return text
@@ -124,13 +124,9 @@ export function distillUserReasoning(raw: string): string[] {
     return fallback ? [fallback] : [];
   }
 
-  const news = bullets.find(isNewsSection);
-  const rest = bullets.filter((line) => line !== news);
-  const head = rest.slice(
-    0,
-    news ? USER_REASONING_MAX_BULLETS - 1 : USER_REASONING_MAX_BULLETS,
-  );
-  return news ? [...head, news] : head;
+  const thesis = bullets[0];
+  const news = bullets.find((line) => line !== thesis && isNewsSection(line));
+  return news ? [thesis, news] : [thesis];
 }
 
 /**
@@ -159,14 +155,17 @@ function sanitizeReasoning(points: string[]): string[] {
         .replace(/\b(?:Claude|Anthropic)\b/gi, "the engine");
 
       const looksLikeEssay =
-        rewritten.length > 220 ||
+        rewritten.length > 120 ||
         /\*\*[^*]+\*\*/.test(rewritten) ||
-        rewritten.split(/\s+/).length > 40;
+        rewritten.split(/\s+/).length > 22;
       return looksLikeEssay ? distillUserReasoning(rewritten) : [stripInsightMarkdown(rewritten)];
     })
     .filter(Boolean);
 
-  return cleaned.slice(0, USER_REASONING_MAX_BULLETS + 1);
+  if (cleaned.some((line) => line.length > 120)) {
+    return distillUserReasoning(cleaned.join("\n"));
+  }
+  return cleaned;
 }
 
 function parseMonitorKey(monitorKey?: string): Partial<Signal> {
