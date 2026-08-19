@@ -4,11 +4,18 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAuthUserProfile } from "@/lib/auth-user";
 import { logout as performLogout } from "@/lib/logout";
+import { useAuthState } from "@/components/auth/auth-provider";
+import { CryptoPaymentModal } from "@/components/settings/crypto-payment-modal";
+import { PaymentMethodModal } from "@/components/settings/payment-method-modal";
 import { PaymentModal } from "@/components/settings/payment-modal";
 import {
   PLAN_META,
+  createBachsUpgradePayment,
   createUpgradePayment,
+  getPaymentMethods,
   getPlanBalance,
+  type PaymentMethodsResponse,
+  type PlanBalanceResponse,
   type PlanId,
   type SubscriptionPlan,
   type TransactionStatusResponse,
@@ -62,6 +69,7 @@ const PLAN_ORDER: Array<"free" | PlanId> = ["free", "pro", "business"];
 
 export default function PricingPage() {
   const router = useRouter();
+  const { isGuest, promptAuth } = useAuthState();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [name, setName] = useState("User");
   const [role, setRole] = useState("Trader");
@@ -73,7 +81,14 @@ export default function PricingPage() {
   const [subscribingPlanId, setSubscribingPlanId] = useState<PlanId | null>(
     null,
   );
+  const [subscribingProvider, setSubscribingProvider] = useState<
+    "paystack" | "bachs" | null
+  >(null);
   const [subscribeError, setSubscribeError] = useState<string | null>(null);
+  const [methodPlanId, setMethodPlanId] = useState<PlanId | null>(null);
+  const [cryptoOpen, setCryptoOpen] = useState(false);
+  const [paymentMethods, setPaymentMethods] =
+    useState<PaymentMethodsResponse | null>(null);
   const [activePayment, setActivePayment] = useState<{
     response: UpgradePaymentResponse;
     planId: PlanId;
@@ -99,16 +114,29 @@ export default function PricingPage() {
   }, []);
 
   useEffect(() => {
+    if (isGuest) {
+      setLoadingPlan(false);
+      return;
+    }
     const controller = new AbortController();
     void refreshBalance(controller.signal);
+    void getPaymentMethods({ signal: controller.signal })
+      .then((methods) => {
+        setPaymentMethods(methods);
+      })
+      .catch(() => {
+        // Fall back to Paystack + Dextopus so a methods outage does not lock checkout.
+      });
     return () => controller.abort();
-  }, [refreshBalance]);
+  }, [isGuest, refreshBalance]);
 
-  const handleSubscribe = useCallback(async (planId: PlanId) => {
+  const startPaystack = useCallback(async (planId: PlanId) => {
     setSubscribingPlanId(planId);
+    setSubscribingProvider("paystack");
     setSubscribeError(null);
     try {
       const response = await createUpgradePayment(planId);
+      setMethodPlanId(null);
       setActivePayment({ response, planId });
     } catch (err) {
       setSubscribeError(
@@ -116,11 +144,43 @@ export default function PricingPage() {
       );
     } finally {
       setSubscribingPlanId(null);
+      setSubscribingProvider(null);
     }
   }, []);
 
+  const startBachs = useCallback(async (planId: PlanId) => {
+    setSubscribingPlanId(planId);
+    setSubscribingProvider("bachs");
+    setSubscribeError(null);
+    try {
+      const response = await createBachsUpgradePayment(planId);
+      setMethodPlanId(null);
+      setActivePayment({ response, planId });
+    } catch (err) {
+      setSubscribeError(
+        (err as Error).message || "Could not start crypto checkout. Try again.",
+      );
+    } finally {
+      setSubscribingPlanId(null);
+      setSubscribingProvider(null);
+    }
+  }, []);
+
+  const handleSelectPlan = useCallback(
+    (planId: PlanId) => {
+      if (isGuest) {
+        promptAuth("Log in to upgrade your plan");
+        return;
+      }
+      setSubscribeError(null);
+      setMethodPlanId(planId);
+    },
+    [isGuest, promptAuth],
+  );
+
   const handleClosePayment = useCallback(() => {
     setActivePayment(null);
+    setCryptoOpen(false);
     void refreshBalance();
   }, [refreshBalance]);
 
@@ -131,13 +191,20 @@ export default function PricingPage() {
     [],
   );
 
+  const handleCryptoSuccess = useCallback((balance: PlanBalanceResponse) => {
+    setCurrentPlan(balance.plan);
+  }, []);
+
   const handleRetryPayment = useCallback(() => {
     const previous = activePayment;
     setActivePayment(null);
-    if (previous) {
-      void handleSubscribe(previous.planId);
+    if (!previous) return;
+    if (previous.response.provider === "bachs") {
+      void startBachs(previous.planId);
+      return;
     }
-  }, [activePayment, handleSubscribe]);
+    void startPaystack(previous.planId);
+  }, [activePayment, startBachs, startPaystack]);
 
   const activePaymentResponse = activePayment?.response ?? null;
   const activePaymentPlanId = activePayment?.planId ?? null;
@@ -201,21 +268,6 @@ export default function PricingPage() {
             </div>
           </div>
 
-          <div className="mt-8 flex flex-col items-center px-4 py-12 text-center">
-            <span className="inline-flex items-center rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-300">
-              Coming Soon
-            </span>
-            <h2 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">
-              Payment plans are coming soon
-            </h2>
-            <p className="mt-2 max-w-md text-sm text-zinc-400">
-              We&apos;re putting the finishing touches on our subscription
-              plans. Check back soon to upgrade.
-            </p>
-          </div>
-
-          {/* TODO: re-enable payment plans — original markup preserved below */}
-          {/*
           <div className="mt-8 flex flex-col items-center text-center">
             <span className="inline-flex items-center rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-300">
               Payment plan
@@ -223,7 +275,7 @@ export default function PricingPage() {
             <h2 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">
               Upgrade your plan
             </h2>
-            {planError && (
+            {planError && !isGuest && (
               <p className="mt-2 text-xs text-red-400">{planError}</p>
             )}
           </div>
@@ -302,7 +354,7 @@ export default function PricingPage() {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => handleSubscribe(id as PlanId)}
+                        onClick={() => handleSelectPlan(id as PlanId)}
                         disabled={subscribingPlanId !== null}
                         className="w-full rounded-md bg-white px-4 py-2.5 text-sm font-medium text-black transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
                       >
@@ -322,12 +374,31 @@ export default function PricingPage() {
               {subscribeError}
             </p>
           )}
-          */}
         </section>
       </div>
 
-      {/* TODO: re-enable when payment plans return */}
-      {/*
+      {methodPlanId && (
+        <PaymentMethodModal
+          planId={methodPlanId}
+          methods={paymentMethods}
+          startingPaystack={
+            subscribingPlanId === methodPlanId &&
+            subscribingProvider === "paystack"
+          }
+          startingBachs={
+            subscribingPlanId === methodPlanId &&
+            subscribingProvider === "bachs"
+          }
+          onClose={() => setMethodPlanId(null)}
+          onPaystack={() => void startPaystack(methodPlanId)}
+          onCrypto={() => {
+            setMethodPlanId(null);
+            setCryptoOpen(true);
+          }}
+          onBachs={() => void startBachs(methodPlanId)}
+        />
+      )}
+
       {activePaymentResponse && activePaymentPlanId && (
         <PaymentModal
           payment={activePaymentResponse}
@@ -337,7 +408,13 @@ export default function PricingPage() {
           onRetry={handleRetryPayment}
         />
       )}
-      */}
+
+      {cryptoOpen && (
+        <CryptoPaymentModal
+          onClose={handleClosePayment}
+          onSuccess={handleCryptoSuccess}
+        />
+      )}
     </main>
   );
 }

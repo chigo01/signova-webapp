@@ -48,6 +48,91 @@ const fallbackSupportResistance: Signal["supportResistance"] = {
   currentLevel: "neutral",
 };
 
+const USER_REASONING_MAX_BULLETS = 4;
+const USER_REASONING_MAX_CHARS = 160;
+
+function stripInsightMarkdown(text: string): string {
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function truncateInsight(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  const sliced = text.slice(0, maxChars);
+  const lastSpace = sliced.lastIndexOf(" ");
+  const clipped = (lastSpace > 60 ? sliced.slice(0, lastSpace) : sliced).trim();
+  return `${clipped.replace(/[.,;:]+$/, "")}…`;
+}
+
+function splitSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function splitInsightChunks(text: string): string[] {
+  const marked = text.replace(/\s*\*\*([^*]{2,80}?):?\*\*:?/g, "\n$1: ");
+  const paragraphs = marked
+    .split(/\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const chunks: string[] = [];
+  for (const paragraph of paragraphs) {
+    if (paragraph.length <= USER_REASONING_MAX_CHARS) {
+      chunks.push(paragraph);
+      continue;
+    }
+    const sentences = splitSentences(paragraph);
+    if (sentences.length > 1) chunks.push(...sentences);
+    else chunks.push(paragraph);
+  }
+  return chunks;
+}
+
+function isNewsSection(line: string): boolean {
+  return (
+    /^(conflict with news|news classified)\b/i.test(line) ||
+    /\barticle\s*\[\d+\]/i.test(line)
+  );
+}
+
+/**
+ * Model 4 used to store the full analyst diary as one reasoning string.
+ * Split markdown essays into the short bullets the vault card can show.
+ */
+export function distillUserReasoning(raw: string): string[] {
+  const text = raw.trim();
+  if (!text) return [];
+
+  const bullets = splitInsightChunks(text)
+    .map(stripInsightMarkdown)
+    .map((part) => truncateInsight(part, USER_REASONING_MAX_CHARS))
+    .filter((part) => part.length >= 20);
+
+  if (bullets.length === 0) {
+    const fallback = truncateInsight(
+      stripInsightMarkdown(text),
+      USER_REASONING_MAX_CHARS,
+    );
+    return fallback ? [fallback] : [];
+  }
+
+  const news = bullets.find(isNewsSection);
+  const rest = bullets.filter((line) => line !== news);
+  const head = rest.slice(
+    0,
+    news ? USER_REASONING_MAX_BULLETS - 1 : USER_REASONING_MAX_BULLETS,
+  );
+  return news ? [...head, news] : head;
+}
+
 /**
  * Strip internal provider attribution from user-facing reasoning text.
  * The contrarian-reversal signal was historically labelled with the engine
@@ -58,10 +143,10 @@ const fallbackSupportResistance: Signal["supportResistance"] = {
  * reason (no longer written for new signals, but stored on older ones).
  */
 function sanitizeReasoning(points: string[]): string[] {
-  return points
+  const cleaned = points
     .filter((p) => !/^(?:LLM optimized R\/R ratio|Math optimized)/i.test(p))
-    .map((p) =>
-      p
+    .flatMap((p) => {
+      const rewritten = p
         // legacy: "Contrarian reverse of Claude worst-5 BUY setup" -> "Contrarian reversal setup (BUY)"
         .replace(
           /Contrarian reverse of Claude worst-5 (BUY|SELL) setup/gi,
@@ -71,8 +156,17 @@ function sanitizeReasoning(points: string[]): string[] {
         .replace(/Reverse trade setup from Claude worst-5:/gi, "Reverse trade setup:")
         // catch-all: remove any remaining provider attribution
         .replace(/\bClaude(?:'s)?\s+(?:worst|best)-5\b/gi, "model")
-        .replace(/\b(?:Claude|Anthropic)\b/gi, "the engine")
-    );
+        .replace(/\b(?:Claude|Anthropic)\b/gi, "the engine");
+
+      const looksLikeEssay =
+        rewritten.length > 220 ||
+        /\*\*[^*]+\*\*/.test(rewritten) ||
+        rewritten.split(/\s+/).length > 40;
+      return looksLikeEssay ? distillUserReasoning(rewritten) : [stripInsightMarkdown(rewritten)];
+    })
+    .filter(Boolean);
+
+  return cleaned.slice(0, USER_REASONING_MAX_BULLETS + 1);
 }
 
 function parseMonitorKey(monitorKey?: string): Partial<Signal> {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   PLAN_META,
   formatNgn,
+  formatUsd,
   getTransactionStatus,
   type PlanId,
   type TransactionStatusResponse,
@@ -115,6 +116,7 @@ export function PaymentModal({
 }: PaymentModalProps) {
   const resolvedPlanId: PlanId = (payment.planId ?? planId) as PlanId;
   const planMeta = PLAN_META[resolvedPlanId] ?? PLAN_META[planId] ?? PLAN_META.pro;
+  const isBachs = payment.provider === "bachs";
   const monthsCount =
     typeof payment.monthsCount === "number" && payment.monthsCount > 0
       ? payment.monthsCount
@@ -195,7 +197,7 @@ export function PaymentModal({
     };
   }, [payment.transactionId, status]);
 
-  const handlePayWithPaystack = useCallback(() => {
+  const handleOpenCheckout = useCallback(() => {
     window.open(payment.authorizationUrl, "_blank", "noopener,noreferrer");
     setStatus((current) => (current === "waiting" ? "confirming" : current));
   }, [payment.authorizationUrl]);
@@ -311,9 +313,9 @@ export function PaymentModal({
         ) : (
           <div className="space-y-4 px-5 py-5">
             <p className="text-sm text-zinc-400">
-              You&apos;ll be taken to Paystack to complete payment securely with
-              card, bank transfer, USSD or QR. Your plan upgrades automatically
-              as soon as we confirm the payment.
+              {isBachs
+                ? "You'll be taken to Bachs to pay with USDT, USDC, ETH, SOL, or BNB. Your plan upgrades automatically as soon as we confirm the payment."
+                : "You'll be taken to Paystack to complete payment securely with card, bank transfer, USSD or QR. Your plan upgrades automatically as soon as we confirm the payment."}
             </p>
 
             <div className="grid gap-3 rounded-lg border border-zinc-800 bg-black/40 p-4">
@@ -322,7 +324,9 @@ export function PaymentModal({
                   Amount
                 </span>
                 <span className="text-right text-base font-semibold text-white">
-                  {formatNgn(payment.amount)}
+                  {isBachs
+                    ? formatUsd(payment.displayUsd ?? payment.amount)
+                    : formatNgn(payment.amount)}
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-3">
@@ -348,7 +352,9 @@ export function PaymentModal({
                 )}
                 <p className="text-sm text-zinc-200">
                   {status === "confirming"
-                    ? "Waiting for Paystack to confirm..."
+                    ? isBachs
+                      ? "Waiting for Bachs to confirm..."
+                      : "Waiting for Paystack to confirm..."
                     : "Ready to pay"}
                 </p>
               </div>
@@ -363,10 +369,10 @@ export function PaymentModal({
 
             <button
               type="button"
-              onClick={handlePayWithPaystack}
+              onClick={handleOpenCheckout}
               className="flex w-full items-center justify-center gap-2 rounded-md bg-white px-4 py-2.5 text-sm font-medium text-black transition-colors hover:bg-zinc-200"
             >
-              Pay with Paystack
+              {isBachs ? "Pay with crypto" : "Pay with Paystack"}
               <ExternalLinkIcon className="h-4 w-4" />
             </button>
           </div>

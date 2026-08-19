@@ -23,6 +23,7 @@ import { API_URL } from "@/lib/config";
 import { getAuthHeaders } from "@/lib/cookies";
 import { PROFILE_ROLES } from "@/lib/profile";
 import { EditProfileModal } from "@/components/dashboard/edit-profile-modal";
+import { getPlanBalance, type SubscriptionPlan } from "@/lib/payments";
 
 // Mirrors the backend default for tradeReversalEnabled (user.model.ts).
 const TRADE_REVERSAL_DEFAULT = true;
@@ -69,7 +70,7 @@ export default function UserSettingsPage() {
   const router = useRouter();
   // The provider is the single source of truth for deletion state so this page
   // and the dashboard banner can never disagree about it.
-  const { pendingDeletion, refreshAuth } = useAuthState();
+  const { isGuest, pendingDeletion, refreshAuth } = useAuthState();
   const {
     revoke: revokeDeletion,
     isRevoking,
@@ -92,6 +93,7 @@ export default function UserSettingsPage() {
     timezone: "UTC",
   });
   const [stockNewsSaving, setStockNewsSaving] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan>("free");
   const isMounted = useRef(true);
 
   useEffect(() => {
@@ -100,6 +102,19 @@ export default function UserSettingsPage() {
       isMounted.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (isGuest) return;
+    const controller = new AbortController();
+    void getPlanBalance({ signal: controller.signal })
+      .then((balance) => {
+        if (isMounted.current) setCurrentPlan(balance.plan);
+      })
+      .catch(() => {
+        // Plan badge falls back to Free if the balance endpoint is unavailable.
+      });
+    return () => controller.abort();
+  }, [isGuest]);
 
   useEffect(() => {
     const cached = getAuthUserProfile();
@@ -301,8 +316,6 @@ export default function UserSettingsPage() {
         <header className="mb-5 flex items-center justify-between sm:mb-6">
           <h1 className="text-2xl font-semibold text-white sm:text-[32px]">Settings</h1>
           <div className="flex items-center gap-2">
-            {/* TODO: re-enable when payment plans return */}
-            {/*
             <button
               type="button"
               onClick={() => router.push("/dashboard/settings/pricing")}
@@ -314,7 +327,6 @@ export default function UserSettingsPage() {
             >
               {currentPlan === "free" ? "Upgrade your plan" : "Manage plan"}
             </button>
-            */}
             <button
               type="button"
               onClick={() => setIsEditOpen(true)}

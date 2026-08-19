@@ -9,6 +9,7 @@ import { AutoJournal } from "@/components/dashboard/auto-journal";
 import { Search, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getPlanBalance, type SubscriptionPlan } from "@/lib/payments";
+import { getAuthUserProfile } from "@/lib/auth-user";
 import { useAuthState } from "@/components/auth/auth-provider";
 
 function formatExpiryDate(value: string | null | undefined): string {
@@ -22,10 +23,22 @@ function formatExpiryDate(value: string | null | undefined): string {
   });
 }
 
+function greetingNameFromProfile(): string {
+  const user = getAuthUserProfile();
+  const fullName = user?.name?.trim();
+  if (fullName) return fullName;
+  return "";
+}
+
 export default function DashboardPage() {
   const { isGuest, promptAuth } = useAuthState();
   const [plan, setPlan] = useState<SubscriptionPlan | null>(null);
   const [proPlanExpiry, setProPlanExpiry] = useState<string | null>(null);
+  const [greetingName, setGreetingName] = useState("");
+
+  useEffect(() => {
+    setGreetingName(greetingNameFromProfile());
+  }, []);
 
   useEffect(() => {
     // Guests have no plan to load — skip the authed call to avoid 401 noise.
@@ -75,7 +88,7 @@ export default function DashboardPage() {
         </header>
 
         <h1 className="mb-5 text-3xl font-semibold tracking-tight bg-linear-to-r from-white via-[#A3A3A3] to-white bg-clip-text text-transparent sm:mb-6 sm:text-4xl md:mb-8">
-          Welcome to SIG<span className="text-[#565656]">NOVA</span>(beta)
+          {greetingName ? `Greetings ${greetingName}` : "Greetings"}
         </h1>
 
         {/* Mobile: Watch tutorials */}
