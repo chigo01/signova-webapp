@@ -4,8 +4,8 @@ import { getAuthHeaders } from "@/lib/cookies";
 export type PlanId = "pro";
 export type SubscriptionPlan = "free" | PlanId;
 
-export const PRO_PLAN_PRICE_USD = 39.99;
-export const PRO_PLAN_PRICE_LABEL = "$39.99";
+export const PRO_PLAN_PRICE_USD = 1;
+export const PRO_PLAN_PRICE_LABEL = "$1.00";
 
 export interface PlanMeta {
   id: PlanId | "free";
