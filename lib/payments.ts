@@ -456,6 +456,35 @@ export async function submitCryptoDepositHash(
   }
 }
 
+export function upgradePaymentFromStatus(
+  status: TransactionStatusResponse,
+): UpgradePaymentResponse {
+  return {
+    message: "Payment resumed",
+    transactionId: status.id,
+    planId: status.planId,
+    monthsCount: status.monthsCount,
+    displayUsd: status.displayUsd ?? status.amount,
+    provider: status.provider,
+    bachsPaymentMethod: status.bachsPaymentMethod,
+    authorizationUrl: status.authorizationUrl,
+    reference: status.reference,
+    amount: status.amount,
+    amountNgn: status.amountNgn,
+    accountNumber: status.accountNumber,
+    accountName: status.accountName,
+    bankName: status.bankName,
+    expiresAt: status.expiresAt,
+  };
+}
+
+export function checkoutIdFromSearch(search: string): string | null {
+  const value = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search)
+    .get("checkout_id")
+    ?.trim();
+  return value || null;
+}
+
 export function formatUsd(amount: number): string {
   return `$${amount.toLocaleString("en-US", {
     minimumFractionDigits: 2,

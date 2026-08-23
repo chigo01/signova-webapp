@@ -281,6 +281,35 @@ function normalizeSignal(signal: ApiSignal): Signal | null {
   };
 }
 
+export function isEmptySignalsHttpError(status: number, body: string): boolean {
+  if (status === 404) return true;
+  const text = body.toLowerCase();
+  return (
+    text.includes("no signals found") || text.includes("no elite signals")
+  );
+}
+
+function httpErrorMessage(
+  status: number,
+  statusText: string,
+  body: string,
+): string {
+  try {
+    const parsed = JSON.parse(body) as { message?: unknown; error?: unknown };
+    if (typeof parsed.message === "string" && parsed.message.trim()) {
+      return parsed.message.trim();
+    }
+    if (typeof parsed.error === "string" && parsed.error.trim()) {
+      return parsed.error.trim();
+    }
+  } catch {
+    // fall through
+  }
+  const trimmed = body.trim();
+  if (trimmed) return trimmed;
+  return statusText || `Request failed (${status})`;
+}
+
 export async function fetchApprovedSignals(): Promise<Signal[]> {
   try {
     const token = getAuthToken();
@@ -293,11 +322,14 @@ export async function fetchApprovedSignals(): Promise<Signal[]> {
     });
 
     if (!res.ok) {
-      if (res.status === 404) {
-        // No signals found is a valid state, return empty array
+      const body = await res.text();
+      // Empty vault days 404 (or a 500 wrapping that) are a valid empty feed.
+      if (isEmptySignalsHttpError(res.status, body)) {
         return [];
       }
-      throw new Error(`Failed to fetch signals: ${res.statusText}`);
+      throw new Error(
+        `Failed to fetch signals: ${httpErrorMessage(res.status, res.statusText, body)}`,
+      );
     }
 
     const data = await res.json();

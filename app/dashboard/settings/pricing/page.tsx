@@ -10,10 +10,13 @@ import { PaymentMethodModal } from "@/components/settings/payment-method-modal";
 import { PaymentModal } from "@/components/settings/payment-modal";
 import {
   PLAN_META,
+  checkoutIdFromSearch,
   createAellaUpgradePayment,
   createBachsUpgradePayment,
   getPaymentMethods,
   getPlanBalance,
+  getTransactionStatus,
+  upgradePaymentFromStatus,
   type BachsCheckoutMethod,
   type PaymentMethodsResponse,
   type PlanId,
@@ -92,6 +95,8 @@ export default function PricingPage() {
     response: UpgradePaymentResponse;
     planId: PlanId;
   } | null>(null);
+  const [resumedStatus, setResumedStatus] =
+    useState<TransactionStatusResponse | null>(null);
 
   useEffect(() => {
     const user = getAuthUserProfile();
@@ -128,6 +133,36 @@ export default function PricingPage() {
       });
     return () => controller.abort();
   }, [isGuest, refreshBalance]);
+
+  useEffect(() => {
+    const checkoutId = checkoutIdFromSearch(window.location.search);
+    if (!checkoutId) return;
+    if (isGuest) {
+      promptAuth("Log in to finish your payment");
+      return;
+    }
+
+    const controller = new AbortController();
+    void getTransactionStatus(checkoutId, { signal: controller.signal })
+      .then((status) => {
+        setSubscribeError(null);
+        setResumedStatus(status);
+        setActivePayment({
+          response: upgradePaymentFromStatus(status),
+          planId: status.planId,
+        });
+        router.replace("/dashboard/settings/pricing", { scroll: false });
+      })
+      .catch((err) => {
+        if ((err as Error).name === "AbortError") return;
+        setSubscribeError(
+          (err as Error).message || "Could not resume that checkout.",
+        );
+        router.replace("/dashboard/settings/pricing", { scroll: false });
+      });
+
+    return () => controller.abort();
+  }, [isGuest, promptAuth, router]);
 
   const startBachs = useCallback(
     async (planId: PlanId, paymentMethod: BachsCheckoutMethod) => {
@@ -184,6 +219,7 @@ export default function PricingPage() {
 
   const handleClosePayment = useCallback(() => {
     setActivePayment(null);
+    setResumedStatus(null);
     void refreshBalance();
   }, [refreshBalance]);
 
@@ -197,6 +233,7 @@ export default function PricingPage() {
   const handleRetryPayment = useCallback(() => {
     const previous = activePayment;
     setActivePayment(null);
+    setResumedStatus(null);
     if (!previous) return;
     if (previous.response.provider === "aella") {
       void startAella(previous.planId);
@@ -408,6 +445,7 @@ export default function PricingPage() {
           <PaymentModal
             payment={activePaymentResponse}
             planId={activePaymentPlanId}
+            resumeFrom={resumedStatus}
             onClose={handleClosePayment}
             onSuccess={handlePaymentSuccess}
             onRetry={handleRetryPayment}

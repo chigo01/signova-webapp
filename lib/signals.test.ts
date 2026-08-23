@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { distillUserReasoning, toLockedSignal } from "./signals";
+import {
+  distillUserReasoning,
+  isEmptySignalsHttpError,
+  toLockedSignal,
+} from "./signals";
 
 describe("toLockedSignal", () => {
   it("passes the public release timestamp through to guest signal cards", () => {
@@ -43,6 +47,28 @@ describe("toLockedSignal", () => {
         timestamp: "2026-07-16T10:00:00.000Z",
       }).approvedAt,
     ).toBeUndefined();
+  });
+});
+
+describe("isEmptySignalsHttpError", () => {
+  it("treats empty vault days as an empty feed", () => {
+    expect(
+      isEmptySignalsHttpError(
+        404,
+        JSON.stringify({ error: "No signals found for today" }),
+      ),
+    ).toBe(true);
+    expect(
+      isEmptySignalsHttpError(
+        500,
+        'Failed to fetch signals from admin server: {"error":"No signals found for today"}',
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps real outages as errors", () => {
+    expect(isEmptySignalsHttpError(500, "ECONNREFUSED")).toBe(false);
+    expect(isEmptySignalsHttpError(503, "")).toBe(false);
   });
 });
 

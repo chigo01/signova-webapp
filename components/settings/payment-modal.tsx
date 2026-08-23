@@ -40,9 +40,20 @@ export interface PaymentModalProps {
   onClose: () => void;
   onSuccess: (status: TransactionStatusResponse) => void;
   onRetry: () => void;
+  resumeFrom?: TransactionStatusResponse | null;
 }
 
 type ModalStatus = "waiting" | "confirming" | "success" | "failed" | "expired";
+
+export function paymentModalStatusFromTransaction(
+  tx: TransactionStatusResponse | null | undefined,
+): ModalStatus {
+  if (!tx) return "waiting";
+  if (tx.status === "success") return "success";
+  if (tx.status === "failed") return "failed";
+  if (new Date(tx.expiresAt).getTime() <= Date.now()) return "expired";
+  return "confirming";
+}
 
 function formatCountdown(remainingMs: number): string {
   if (remainingMs <= 0) return "00:00";
@@ -134,6 +145,7 @@ export function PaymentModal({
   onClose,
   onSuccess,
   onRetry,
+  resumeFrom = null,
 }: PaymentModalProps) {
   const resolvedPlanId: PlanId = (payment.planId ?? planId) as PlanId;
   const planMeta = PLAN_META[resolvedPlanId] ?? PLAN_META[planId] ?? PLAN_META.pro;
@@ -144,8 +156,12 @@ export function PaymentModal({
   const checkoutCopy =
     CHECKOUT_COPY[payment.bachsPaymentMethod ?? "crypto"];
 
-  const [status, setStatus] = useState<ModalStatus>("waiting");
-  const [latest, setLatest] = useState<TransactionStatusResponse | null>(null);
+  const [status, setStatus] = useState<ModalStatus>(() =>
+    paymentModalStatusFromTransaction(resumeFrom),
+  );
+  const [latest, setLatest] = useState<TransactionStatusResponse | null>(
+    resumeFrom,
+  );
   const [remainingMs, setRemainingMs] = useState<number>(() => {
     const expiry = new Date(payment.expiresAt).getTime();
     return Math.max(0, expiry - Date.now());
@@ -157,6 +173,12 @@ export function PaymentModal({
   useEffect(() => {
     successCallbackRef.current = onSuccess;
   }, [onSuccess]);
+
+  useEffect(() => {
+    if (resumeFrom?.status === "success") {
+      successCallbackRef.current(resumeFrom);
+    }
+  }, [resumeFrom]);
 
   useEffect(() => {
     if (status !== "waiting" && status !== "confirming") return;
