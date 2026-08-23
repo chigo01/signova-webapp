@@ -2,10 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
   chainLabel,
   checkoutIdFromSearch,
+  formatExpiryDate,
   upgradePaymentFromStatus,
   type TransactionStatusResponse,
 } from "./payments";
 import { paymentModalStatusFromTransaction } from "@/components/settings/payment-modal";
+
+describe("formatExpiryDate", () => {
+  it("prints the UTC calendar day so a 30-day grant from August is still 2026", () => {
+    expect(formatExpiryDate("2026-09-22T12:00:00.000Z")).toBe("Sep 22, 2026");
+  });
+});
 
 describe("chainLabel", () => {
   it("title-cases a blockchain name", () => {

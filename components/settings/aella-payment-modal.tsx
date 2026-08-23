@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   PLAN_META,
+  formatExpiryDate,
   formatNgn,
   formatUsd,
   getTransactionStatus,
@@ -31,16 +32,7 @@ function formatCountdown(remainingMs: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-function formatExpiryDate(value: string | null | undefined): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
+
 
 function CheckIcon({ className }: { className?: string }) {
   return (
@@ -261,7 +253,8 @@ export function AellaPaymentModal({
             </p>
             {successExpiry && (
               <p className="text-sm text-zinc-400">
-                Renews on <span className="text-zinc-200">{successExpiry}</span>
+                Expires on{" "}
+                <span className="text-zinc-200">{successExpiry}</span>
               </p>
             )}
             <button

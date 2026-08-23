@@ -14,6 +14,7 @@ import {
   type DepositSource,
   type DepositSourceChain,
   PRO_PLAN_PRICE_LABEL,
+  formatExpiryDate,
   type PlanBalanceResponse,
 } from "@/lib/payments";
 
@@ -48,16 +49,7 @@ function formatCountdown(remainingMs: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-function formatExpiryDate(value: string | null | undefined): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
+
 
 function matchesPopular(
   source: DepositSource,
@@ -462,7 +454,7 @@ export function CryptoPaymentModal({
               </p>
               {successExpiry ? (
                 <p className="text-sm text-zinc-400">
-                  Renews on{" "}
+                  Expires on{" "}
                   <span className="text-zinc-200">{successExpiry}</span>
                 </p>
               ) : null}

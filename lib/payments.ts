@@ -7,6 +7,18 @@ export type SubscriptionPlan = "free" | PlanId;
 export const PRO_PLAN_PRICE_USD = 1;
 export const PRO_PLAN_PRICE_LABEL = "$1.00";
 
+export function formatExpiryDate(value: string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 export interface PlanMeta {
   id: PlanId | "free";
   badge: string;

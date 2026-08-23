@@ -8,20 +8,13 @@ import { SignalVaultPreview } from "@/components/dashboard/signal-vault-preview"
 import { AutoJournal } from "@/components/dashboard/auto-journal";
 import { Search, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getPlanBalance, type SubscriptionPlan } from "@/lib/payments";
+import {
+  formatExpiryDate,
+  getPlanBalance,
+  type SubscriptionPlan,
+} from "@/lib/payments";
 import { getAuthUserProfile } from "@/lib/auth-user";
 import { useAuthState } from "@/components/auth/auth-provider";
-
-function formatExpiryDate(value: string | null | undefined): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
 
 function greetingNameFromProfile(): string {
   const user = getAuthUserProfile();
@@ -152,7 +145,7 @@ export default function DashboardPage() {
               Pro
             </span>
             <p className="text-sm text-zinc-300">
-              Renews on <span className="text-zinc-100">{expiryLabel}</span>
+              Expires on <span className="text-zinc-100">{expiryLabel}</span>
             </p>
             <Link
               href="/dashboard/settings/pricing"
