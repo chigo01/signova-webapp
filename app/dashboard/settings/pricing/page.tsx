@@ -5,17 +5,17 @@ import { useRouter } from "next/navigation";
 import { getAuthUserProfile } from "@/lib/auth-user";
 import { logout as performLogout } from "@/lib/logout";
 import { useAuthState } from "@/components/auth/auth-provider";
-import { CryptoPaymentModal } from "@/components/settings/crypto-payment-modal";
+import { AellaPaymentModal } from "@/components/settings/aella-payment-modal";
 import { PaymentMethodModal } from "@/components/settings/payment-method-modal";
 import { PaymentModal } from "@/components/settings/payment-modal";
 import {
   PLAN_META,
+  createAellaUpgradePayment,
   createBachsUpgradePayment,
-  createUpgradePayment,
   getPaymentMethods,
   getPlanBalance,
+  type BachsCheckoutMethod,
   type PaymentMethodsResponse,
-  type PlanBalanceResponse,
   type PlanId,
   type SubscriptionPlan,
   type TransactionStatusResponse,
@@ -65,7 +65,7 @@ function BackArrow({ className }: { className?: string }) {
   );
 }
 
-const PLAN_ORDER: Array<"free" | PlanId> = ["free", "pro", "business"];
+const PLAN_ORDER: Array<"free" | PlanId> = ["free", "pro"];
 
 export default function PricingPage() {
   const router = useRouter();
@@ -81,12 +81,11 @@ export default function PricingPage() {
   const [subscribingPlanId, setSubscribingPlanId] = useState<PlanId | null>(
     null,
   );
-  const [subscribingProvider, setSubscribingProvider] = useState<
-    "paystack" | "bachs" | null
-  >(null);
+  const [subscribingMethod, setSubscribingMethod] =
+    useState<BachsCheckoutMethod | null>(null);
+  const [startingAella, setStartingAella] = useState(false);
   const [subscribeError, setSubscribeError] = useState<string | null>(null);
   const [methodPlanId, setMethodPlanId] = useState<PlanId | null>(null);
-  const [cryptoOpen, setCryptoOpen] = useState(false);
   const [paymentMethods, setPaymentMethods] =
     useState<PaymentMethodsResponse | null>(null);
   const [activePayment, setActivePayment] = useState<{
@@ -125,44 +124,49 @@ export default function PricingPage() {
         setPaymentMethods(methods);
       })
       .catch(() => {
-        // Fall back to Paystack + Dextopus so a methods outage does not lock checkout.
+        // Fall back to showing Bachs options so a methods outage does not lock checkout.
       });
     return () => controller.abort();
   }, [isGuest, refreshBalance]);
 
-  const startPaystack = useCallback(async (planId: PlanId) => {
-    setSubscribingPlanId(planId);
-    setSubscribingProvider("paystack");
-    setSubscribeError(null);
-    try {
-      const response = await createUpgradePayment(planId);
-      setMethodPlanId(null);
-      setActivePayment({ response, planId });
-    } catch (err) {
-      setSubscribeError(
-        (err as Error).message || "Could not start payment. Try again.",
-      );
-    } finally {
-      setSubscribingPlanId(null);
-      setSubscribingProvider(null);
-    }
-  }, []);
+  const startBachs = useCallback(
+    async (planId: PlanId, paymentMethod: BachsCheckoutMethod) => {
+      setSubscribingPlanId(planId);
+      setSubscribingMethod(paymentMethod);
+      setStartingAella(false);
+      setSubscribeError(null);
+      try {
+        const response = await createBachsUpgradePayment(planId, paymentMethod);
+        setMethodPlanId(null);
+        setActivePayment({ response, planId });
+      } catch (err) {
+        setSubscribeError(
+          (err as Error).message || "Could not start checkout. Try again.",
+        );
+      } finally {
+        setSubscribingPlanId(null);
+        setSubscribingMethod(null);
+      }
+    },
+    [],
+  );
 
-  const startBachs = useCallback(async (planId: PlanId) => {
+  const startAella = useCallback(async (planId: PlanId) => {
     setSubscribingPlanId(planId);
-    setSubscribingProvider("bachs");
+    setSubscribingMethod(null);
+    setStartingAella(true);
     setSubscribeError(null);
     try {
-      const response = await createBachsUpgradePayment(planId);
+      const response = await createAellaUpgradePayment(planId);
       setMethodPlanId(null);
       setActivePayment({ response, planId });
     } catch (err) {
       setSubscribeError(
-        (err as Error).message || "Could not start crypto checkout. Try again.",
+        (err as Error).message || "Could not start NGN bank transfer. Try again.",
       );
     } finally {
       setSubscribingPlanId(null);
-      setSubscribingProvider(null);
+      setStartingAella(false);
     }
   }, []);
 
@@ -180,7 +184,6 @@ export default function PricingPage() {
 
   const handleClosePayment = useCallback(() => {
     setActivePayment(null);
-    setCryptoOpen(false);
     void refreshBalance();
   }, [refreshBalance]);
 
@@ -191,20 +194,17 @@ export default function PricingPage() {
     [],
   );
 
-  const handleCryptoSuccess = useCallback((balance: PlanBalanceResponse) => {
-    setCurrentPlan(balance.plan);
-  }, []);
-
   const handleRetryPayment = useCallback(() => {
     const previous = activePayment;
     setActivePayment(null);
     if (!previous) return;
-    if (previous.response.provider === "bachs") {
-      void startBachs(previous.planId);
+    if (previous.response.provider === "aella") {
+      void startAella(previous.planId);
       return;
     }
-    void startPaystack(previous.planId);
-  }, [activePayment, startBachs, startPaystack]);
+    const method = previous.response.bachsPaymentMethod ?? "crypto";
+    void startBachs(previous.planId, method);
+  }, [activePayment, startAella, startBachs]);
 
   const activePaymentResponse = activePayment?.response ?? null;
   const activePaymentPlanId = activePayment?.planId ?? null;
@@ -280,12 +280,11 @@ export default function PricingPage() {
             )}
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
             {PLAN_ORDER.map((id) => {
               const meta = PLAN_META[id];
               const isCurrent = !loadingPlan && currentPlan === id;
               const isFree = id === "free";
-              const isPro = id === "pro";
               return (
                 <article
                   key={id}
@@ -296,9 +295,7 @@ export default function PricingPage() {
                       className={
                         isFree
                           ? "inline-flex items-center rounded-md bg-emerald-400 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-black"
-                          : isPro
-                            ? "inline-flex items-center rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-200"
-                            : "inline-flex items-center rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-200"
+                          : "inline-flex items-center rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-200"
                       }
                     >
                       {meta.badge}
@@ -381,40 +378,41 @@ export default function PricingPage() {
         <PaymentMethodModal
           planId={methodPlanId}
           methods={paymentMethods}
-          startingPaystack={
-            subscribingPlanId === methodPlanId &&
-            subscribingProvider === "paystack"
+          startingAella={
+            subscribingPlanId === methodPlanId && startingAella
           }
-          startingBachs={
-            subscribingPlanId === methodPlanId &&
-            subscribingProvider === "bachs"
+          startingMethod={
+            subscribingPlanId === methodPlanId ? subscribingMethod : null
           }
           onClose={() => setMethodPlanId(null)}
-          onPaystack={() => void startPaystack(methodPlanId)}
-          onCrypto={() => {
-            setMethodPlanId(null);
-            setCryptoOpen(true);
-          }}
-          onBachs={() => void startBachs(methodPlanId)}
+          onAella={() => void startAella(methodPlanId)}
+          onBachs={(method) => void startBachs(methodPlanId, method)}
         />
       )}
 
-      {activePaymentResponse && activePaymentPlanId && (
-        <PaymentModal
-          payment={activePaymentResponse}
-          planId={activePaymentPlanId}
-          onClose={handleClosePayment}
-          onSuccess={handlePaymentSuccess}
-          onRetry={handleRetryPayment}
-        />
-      )}
+      {activePaymentResponse &&
+        activePaymentPlanId &&
+        activePaymentResponse.provider === "aella" && (
+          <AellaPaymentModal
+            payment={activePaymentResponse}
+            planId={activePaymentPlanId}
+            onClose={handleClosePayment}
+            onSuccess={handlePaymentSuccess}
+            onRetry={handleRetryPayment}
+          />
+        )}
 
-      {cryptoOpen && (
-        <CryptoPaymentModal
-          onClose={handleClosePayment}
-          onSuccess={handleCryptoSuccess}
-        />
-      )}
+      {activePaymentResponse &&
+        activePaymentPlanId &&
+        activePaymentResponse.provider !== "aella" && (
+          <PaymentModal
+            payment={activePaymentResponse}
+            planId={activePaymentPlanId}
+            onClose={handleClosePayment}
+            onSuccess={handlePaymentSuccess}
+            onRetry={handleRetryPayment}
+          />
+        )}
     </main>
   );
 }

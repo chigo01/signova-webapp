@@ -82,13 +82,6 @@ function PlanBadge({ plan }: { plan: SubscriptionPlan }) {
       </span>
     );
   }
-  if (plan === "business") {
-    return (
-      <span className="ml-2 shrink-0 rounded-md border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300">
-        Business
-      </span>
-    );
-  }
   return (
     <span className="ml-2 shrink-0 rounded-md border border-zinc-700 bg-zinc-800/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
       Free

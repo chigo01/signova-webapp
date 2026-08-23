@@ -1,8 +1,11 @@
 import { API_URL } from "@/lib/config";
 import { getAuthHeaders } from "@/lib/cookies";
 
-export type PlanId = "pro" | "business";
+export type PlanId = "pro";
 export type SubscriptionPlan = "free" | PlanId;
+
+export const PRO_PLAN_PRICE_USD = 39.99;
+export const PRO_PLAN_PRICE_LABEL = "$39.99";
 
 export interface PlanMeta {
   id: PlanId | "free";
@@ -32,7 +35,7 @@ export const PLAN_META: Record<PlanId | "free", PlanMeta> = {
   pro: {
     id: "pro",
     badge: "PRO PLAN",
-    priceUsdLabel: "\u20a6100",
+    priceUsdLabel: PRO_PLAN_PRICE_LABEL,
     durationLabel: "For 1 month",
     periodLabel: "Monthly",
     features: [
@@ -43,23 +46,10 @@ export const PLAN_META: Record<PlanId | "free", PlanMeta> = {
       "Market Sentiment Context",
     ],
   },
-  business: {
-    id: "business",
-    badge: "BUSINESS PLAN",
-    priceUsdLabel: "\u20a6200",
-    durationLabel: "For 2 months.",
-    periodLabel: "Test pricing",
-    features: [
-      "Market Direction Signals",
-      "Entry + Exit Zones",
-      "Risk Level Indicators",
-      "Market Context Notes",
-      "Trade Setup Explanations",
-    ],
-  },
 };
 
-export type PaymentProvider = "paystack" | "bachs";
+export type PaymentProvider = "bachs" | "aella";
+export type BachsCheckoutMethod = "bank_transfer" | "card" | "crypto";
 
 export interface UpgradePaymentResponse {
   message: string;
@@ -68,9 +58,14 @@ export interface UpgradePaymentResponse {
   monthsCount: number;
   displayUsd: number;
   provider?: PaymentProvider;
+  bachsPaymentMethod?: BachsCheckoutMethod;
   authorizationUrl: string;
   reference: string;
   amount: number;
+  amountNgn?: number;
+  accountNumber?: string;
+  accountName?: string;
+  bankName?: string;
   expiresAt: string;
 }
 
@@ -80,8 +75,13 @@ export interface TransactionStatusResponse {
   planId: PlanId;
   monthsCount: number;
   provider?: PaymentProvider;
+  bachsPaymentMethod?: BachsCheckoutMethod;
   amount: number;
   displayUsd?: number;
+  amountNgn?: number;
+  accountNumber?: string;
+  accountName?: string;
+  bankName?: string;
   authorizationUrl: string;
   reference: string;
   expiresAt: string;
@@ -120,9 +120,9 @@ export interface PaymentRailStatus {
 }
 
 export interface PaymentMethodsResponse {
-  paystack: PaymentRailStatus;
   dextopus: PaymentRailStatus;
   bachs: PaymentRailStatus;
+  aella?: PaymentRailStatus;
 }
 
 export async function getPaymentMethods(
@@ -141,17 +141,18 @@ export async function getPaymentMethods(
   return (await response.json()) as PaymentMethodsResponse;
 }
 
-export async function createUpgradePayment(
+export async function createBachsUpgradePayment(
   planId: PlanId,
+  paymentMethod: BachsCheckoutMethod,
   options: { signal?: AbortSignal } = {},
 ): Promise<UpgradePaymentResponse> {
-  const response = await fetch(`${apiBase()}/payments/upgrade`, {
+  const response = await fetch(`${apiBase()}/payments/upgrade/bachs`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...getAuthHeaders(),
     },
-    body: JSON.stringify({ planId }),
+    body: JSON.stringify({ planId, paymentMethod }),
     signal: options.signal,
   });
 
@@ -162,11 +163,11 @@ export async function createUpgradePayment(
   return (await response.json()) as UpgradePaymentResponse;
 }
 
-export async function createBachsUpgradePayment(
+export async function createAellaUpgradePayment(
   planId: PlanId,
   options: { signal?: AbortSignal } = {},
 ): Promise<UpgradePaymentResponse> {
-  const response = await fetch(`${apiBase()}/payments/upgrade/bachs`, {
+  const response = await fetch(`${apiBase()}/payments/upgrade/aella`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -455,12 +456,15 @@ export async function submitCryptoDepositHash(
   }
 }
 
-export function formatNgn(amount: number): string {
-  return `₦${amount.toLocaleString("en-NG")}`;
-}
-
 export function formatUsd(amount: number): string {
   return `$${amount.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+export function formatNgn(amount: number): string {
+  return `₦${amount.toLocaleString("en-NG", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;

@@ -437,7 +437,7 @@ export function CryptoPaymentModal({
         <header className="flex items-start justify-between border-b border-zinc-800 px-5 py-4">
           <div>
             <p className="text-xs uppercase tracking-wider text-zinc-500">
-              Pro · $100 / 1 month
+              Pro · $39.99 / 1 month
             </p>
             <h2
               id="crypto-payment-title"
@@ -503,7 +503,7 @@ export function CryptoPaymentModal({
             <div className="space-y-4">
               <p className="text-sm text-zinc-400">
                 Pick the token you will send. We convert it and credit 1 month of
-                Pro once $100 arrives.
+                Pro once $39.99 arrives.
               </p>
               {loadingSources ? (
                 <p className="text-sm text-zinc-500">Loading networks…</p>
@@ -611,7 +611,7 @@ export function CryptoPaymentModal({
               <div className="grid gap-2 rounded-lg border border-zinc-800 bg-black/40 p-4 text-sm">
                 <div className="flex justify-between gap-3">
                   <span className="text-zinc-500">Pro plan</span>
-                  <span className="text-zinc-100">$100 / 1 month</span>
+                  <span className="text-zinc-100">$39.99 / 1 month</span>
                 </div>
                 <div className="flex justify-between gap-3">
                   <span className="text-zinc-500">Expected arrival</span>
@@ -623,7 +623,7 @@ export function CryptoPaymentModal({
                 </div>
               </div>
               <p className="text-xs text-zinc-500">
-                Includes routing and a 0.25% protocol fee so at least $100
+                Includes routing and a 0.25% protocol fee so at least $39.99
                 settles. Send the exact quoted amount from your own wallet.
               </p>
               {previewError ? (

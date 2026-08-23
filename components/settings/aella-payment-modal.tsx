@@ -3,38 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   PLAN_META,
+  formatNgn,
   formatUsd,
   getTransactionStatus,
-  type BachsCheckoutMethod,
   type PlanId,
   type TransactionStatusResponse,
   type UpgradePaymentResponse,
 } from "@/lib/payments";
 
-const CHECKOUT_COPY: Record<
-  BachsCheckoutMethod,
-  { blurb: string; cta: string }
-> = {
-  bank_transfer: {
-    blurb:
-      "You'll be taken to Bachs to pay by Nigerian bank transfer in Naira. Your plan upgrades automatically as soon as we confirm the payment.",
-    cta: "Continue to NGN checkout",
-  },
-  card: {
-    blurb:
-      "You'll be taken to Bachs to pay by Visa or Mastercard in USD or NGN. Your plan upgrades automatically as soon as we confirm the payment.",
-    cta: "Continue to card checkout",
-  },
-  crypto: {
-    blurb:
-      "You'll be taken to Bachs to pay with USDT, USDC, ETH, SOL, or BNB. Your plan upgrades automatically as soon as we confirm the payment.",
-    cta: "Continue to crypto checkout",
-  },
-};
-
 const POLL_INTERVAL_MS = 4_000;
 
-export interface PaymentModalProps {
+export interface AellaPaymentModalProps {
   payment: UpgradePaymentResponse;
   planId: PlanId;
   onClose: () => void;
@@ -108,41 +87,23 @@ function SpinnerIcon({ className }: { className?: string }) {
   );
 }
 
-function ExternalLinkIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M15 3h6v6" />
-      <path d="M10 14 21 3" />
-      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-    </svg>
-  );
-}
-
-export function PaymentModal({
+export function AellaPaymentModal({
   payment,
   planId,
   onClose,
   onSuccess,
   onRetry,
-}: PaymentModalProps) {
+}: AellaPaymentModalProps) {
   const resolvedPlanId: PlanId = (payment.planId ?? planId) as PlanId;
   const planMeta = PLAN_META[resolvedPlanId] ?? PLAN_META[planId] ?? PLAN_META.pro;
   const monthsCount =
     typeof payment.monthsCount === "number" && payment.monthsCount > 0
       ? payment.monthsCount
       : 1;
-  const checkoutCopy =
-    CHECKOUT_COPY[payment.bachsPaymentMethod ?? "crypto"];
+  const amountNgn = payment.amountNgn ?? 0;
+  const accountNumber = payment.accountNumber ?? "";
+  const accountName = payment.accountName ?? "";
+  const bankName = payment.bankName ?? "Aella Microfinance Bank";
 
   const [status, setStatus] = useState<ModalStatus>("waiting");
   const [latest, setLatest] = useState<TransactionStatusResponse | null>(null);
@@ -151,6 +112,7 @@ export function PaymentModal({
     return Math.max(0, expiry - Date.now());
   });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [copied, setCopied] = useState<"account" | "amount" | null>(null);
 
   const successCallbackRef = useRef(onSuccess);
 
@@ -199,6 +161,8 @@ export function PaymentModal({
           successCallbackRef.current(result);
         } else if (result.status === "failed") {
           setStatus("failed");
+        } else {
+          setStatus("confirming");
         }
       } catch (err) {
         if (cancelled) return;
@@ -217,10 +181,15 @@ export function PaymentModal({
     };
   }, [payment.transactionId, status]);
 
-  const handleOpenCheckout = useCallback(() => {
-    window.open(payment.authorizationUrl, "_blank", "noopener,noreferrer");
-    setStatus((current) => (current === "waiting" ? "confirming" : current));
-  }, [payment.authorizationUrl]);
+  const handleCopy = useCallback(async (value: string, kind: "account" | "amount") => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(kind);
+      window.setTimeout(() => setCopied(null), 1500);
+    } catch {
+      setErrorMessage("Could not copy to clipboard");
+    }
+  }, []);
 
   const successExpiry = useMemo(
     () => formatExpiryDate(latest?.user.proPlanExpiry),
@@ -234,7 +203,7 @@ export function PaymentModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="payment-modal-title"
+      aria-labelledby="aella-payment-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
     >
       <div className="w-full max-w-md overflow-hidden rounded-xl border border-zinc-800 bg-[#0a0a0a] shadow-xl">
@@ -244,7 +213,7 @@ export function PaymentModal({
               {planMeta.badge}
             </p>
             <h2
-              id="payment-modal-title"
+              id="aella-payment-title"
               className="mt-1 text-lg font-semibold text-white"
             >
               {status === "success"
@@ -253,7 +222,7 @@ export function PaymentModal({
                   ? "Payment session expired"
                   : status === "failed"
                     ? "Payment failed"
-                    : "Complete your payment"}
+                    : "Transfer to this account"}
             </h2>
           </div>
           <button
@@ -286,10 +255,7 @@ export function PaymentModal({
               <CheckIcon className="h-7 w-7" />
             </div>
             <p className="text-base text-white">
-              You&apos;re upgraded to{" "}
-              <span className="font-semibold">
-                Pro
-              </span>{" "}
+              You&apos;re upgraded to <span className="font-semibold">Pro</span>{" "}
               for {monthsCount} month
               {monthsCount > 1 ? "s" : ""}.
             </p>
@@ -332,26 +298,27 @@ export function PaymentModal({
           </div>
         ) : (
           <div className="space-y-4 px-5 py-5">
-            <p className="text-sm text-zinc-400">{checkoutCopy.blurb}</p>
+            <p className="text-sm text-zinc-400">
+              Send exactly {formatNgn(amountNgn)} from your Nigerian bank app.
+              The account number only accepts that amount.
+            </p>
 
             <div className="grid gap-3 rounded-lg border border-zinc-800 bg-black/40 p-4">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-xs uppercase tracking-wider text-zinc-500">
-                  Amount
-                </span>
-                <span className="text-right text-base font-semibold text-white">
-                  {formatUsd(payment.displayUsd ?? payment.amount)}
-                </span>
-              </div>
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-xs uppercase tracking-wider text-zinc-500">
-                  Plan
-                </span>
-                <span className="text-right text-sm font-medium text-zinc-100">
-                  {planMeta.badge} · {monthsCount} month
-                  {monthsCount > 1 ? "s" : ""}
-                </span>
-              </div>
+              <DetailRow label="Bank" value={bankName} />
+              <DetailRow label="Account name" value={accountName} />
+              <DetailRow
+                label="Account number"
+                value={accountNumber}
+                actionLabel={copied === "account" ? "Copied" : "Copy"}
+                onAction={() => void handleCopy(accountNumber, "account")}
+              />
+              <DetailRow
+                label="Amount"
+                value={formatNgn(amountNgn)}
+                hint={formatUsd(payment.displayUsd ?? payment.amount)}
+                actionLabel={copied === "amount" ? "Copied" : "Copy"}
+                onAction={() => void handleCopy(String(amountNgn), "amount")}
+              />
             </div>
 
             <div className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-black/40 px-4 py-3">
@@ -366,8 +333,8 @@ export function PaymentModal({
                 )}
                 <p className="text-sm text-zinc-200">
                   {status === "confirming"
-                    ? "Waiting for Bachs to confirm..."
-                    : "Ready to pay"}
+                    ? "Waiting for the transfer…"
+                    : "Waiting for payment"}
                 </p>
               </div>
               <span className="font-mono text-xs text-zinc-400">
@@ -378,15 +345,6 @@ export function PaymentModal({
             {errorMessage && (
               <p className="text-xs text-red-400">{errorMessage}</p>
             )}
-
-            <button
-              type="button"
-              onClick={handleOpenCheckout}
-              className="flex w-full items-center justify-center gap-2 rounded-md bg-white px-4 py-2.5 text-sm font-medium text-black transition-colors hover:bg-zinc-200"
-            >
-              {checkoutCopy.cta}
-              <ExternalLinkIcon className="h-4 w-4" />
-            </button>
           </div>
         )}
 
@@ -397,6 +355,41 @@ export function PaymentModal({
             </p>
           </footer>
         )}
+      </div>
+    </div>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+  hint,
+  actionLabel,
+  onAction,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="text-xs uppercase tracking-wider text-zinc-500">
+        {label}
+      </span>
+      <div className="flex min-w-0 flex-col items-end gap-1">
+        <span className="text-right text-sm font-medium text-white">{value}</span>
+        {hint ? <span className="text-xs text-zinc-500">{hint}</span> : null}
+        {onAction && actionLabel ? (
+          <button
+            type="button"
+            onClick={onAction}
+            className="text-xs text-zinc-400 transition-colors hover:text-zinc-200"
+          >
+            {actionLabel}
+          </button>
+        ) : null}
       </div>
     </div>
   );

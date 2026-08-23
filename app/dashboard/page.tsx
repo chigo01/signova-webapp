@@ -146,16 +146,10 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {!isGuest && (plan === "pro" || plan === "business") && expiryLabel && (
+        {!isGuest && plan === "pro" && expiryLabel && (
           <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-zinc-800 bg-[#090909] px-4 py-3 sm:mb-6">
-            <span
-              className={
-                plan === "business"
-                  ? "rounded-md border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300"
-                  : "rounded-md border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-300"
-              }
-            >
-              {plan === "business" ? "Business" : "Pro"}
+            <span className="rounded-md border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
+              Pro
             </span>
             <p className="text-sm text-zinc-300">
               Renews on <span className="text-zinc-100">{expiryLabel}</span>
