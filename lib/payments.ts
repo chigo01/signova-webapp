@@ -4,8 +4,8 @@ import { getAuthHeaders } from "@/lib/cookies";
 export type PlanId = "pro";
 export type SubscriptionPlan = "free" | PlanId;
 
-export const PRO_PLAN_PRICE_USD = 3;
-export const PRO_PLAN_PRICE_LABEL = "$3.00";
+export const PRO_PLAN_PRICE_USD = 39.99;
+export const PRO_PLAN_PRICE_LABEL = "$39.99";
 
 export function formatExpiryDate(value: string | null | undefined): string {
   if (!value) return "";
