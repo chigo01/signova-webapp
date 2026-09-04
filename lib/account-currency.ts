@@ -13,9 +13,11 @@ export interface AccountCurrency {
 
 /**
  * The currencies a trading account can be held in, in the order brokers
- * conventionally list them. Every fiat entry here resolves on the price feed
- * (lib/quote-rate.ts); BTC and ETH depend on the backend's crypto path and fall
- * back to a typed rate if it's unavailable.
+ * conventionally list them. Most fiat entries resolve on the price feed
+ * (lib/quote-rate.ts); NGN uses a fixed 1400 NGN per USD because Nigerian
+ * brokers size Naira accounts at that round number rather than a live quote.
+ * BTC and ETH depend on the backend's crypto path and fall back to a typed
+ * rate if it's unavailable.
  */
 export const ACCOUNT_CURRENCIES: AccountCurrency[] = [
   { code: "USD", name: "US Dollar" },
@@ -28,6 +30,7 @@ export const ACCOUNT_CURRENCIES: AccountCurrency[] = [
   { code: "NZD", name: "New Zealand Dollar" },
   { code: "HKD", name: "Hong Kong Dollar" },
   { code: "JPY", name: "Japanese Yen" },
+  { code: "NGN", name: "Nigerian Naira" },
   { code: "BTC", name: "Bitcoin" },
   { code: "ETH", name: "Ethereum" },
 ];

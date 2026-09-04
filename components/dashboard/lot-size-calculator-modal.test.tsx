@@ -529,6 +529,31 @@ describe("LotSizeCalculatorModal", () => {
       await waitFor(() => expect(field("Account balance").value).toBe("500"));
     });
 
+    it("offers Naira and converts at the fixed 1400 without a feed lookup", async () => {
+      const fetchMock = stubCandles({});
+      render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);
+
+      expect(
+        Array.from(currency().options).map((option) => option.value),
+      ).toContain("NGN");
+
+      selectCurrency("NGN");
+
+      // USD is identity and NGN is static, so both peekUsdPerUnit legs are
+      // warm and the 10,000 → 14,000,000 conversion is synchronous.
+      await waitFor(() =>
+        expect(field("Account balance").value).toBe("14000000"),
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(screen.getByLabelText("NGN per 1 USD")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(field("NGN per 1 USD").value).toBe("1400"),
+      );
+      // Risk scales with the balance, so the lot size stays 0.33.
+      expect(screen.getByText("0.33")).toBeInTheDocument();
+      expect(storedSettings().accountCurrency).toBe("NGN");
+    });
+
     it("warns rather than silently relabelling when the balance can't convert", async () => {
       stubCandles({});
       render(<LotSizeCalculatorModal signal={makeSignal()} onClose={() => {}} />);

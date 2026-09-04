@@ -46,6 +46,7 @@ describe("formatMoney", () => {
     ["EUR", "€10,000.00"],
     ["AED", `AED${NBSP}10,000.00`],
     ["SGD", `SGD${NBSP}10,000.00`],
+    ["NGN", `NGN${NBSP}10,000.00`],
   ])("formats %s", (code, expected) => {
     expect(formatMoney(10_000, code)).toBe(expected);
   });
@@ -78,6 +79,7 @@ describe("currencySymbol", () => {
     ["HKD", "HK$"],
     ["AED", "AED"],
     ["SGD", "SGD"],
+    ["NGN", "NGN"],
     ["BTC", "BTC"],
     ["ETH", "ETH"],
   ])("gives %s the symbol %s", (code, expected) => {
@@ -92,7 +94,7 @@ describe("currencySymbol", () => {
 });
 
 describe("isAccountCurrency", () => {
-  it.each([["USD"], ["JPY"], ["BTC"]])("accepts %s", (code) => {
+  it.each([["USD"], ["JPY"], ["NGN"], ["BTC"]])("accepts %s", (code) => {
     expect(isAccountCurrency(code)).toBe(true);
   });
 

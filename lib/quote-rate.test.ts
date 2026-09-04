@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fetchAccountPerQuoteUnit,
   fetchUsdPerUnit,
+  NGN_PER_USD,
   peekUsdPerUnit,
   resetQuoteRateCache,
 } from "./quote-rate";
@@ -54,6 +55,13 @@ describe("fetchUsdPerUnit", () => {
     const fetchMock = stubCandles({});
 
     expect(await fetchUsdPerUnit("USD")).toBe(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("uses the fixed Naira rate instead of the candle feed", async () => {
+    const fetchMock = stubCandles({ USDNGN: 1600, NGNUSD: 0.0007 });
+
+    expect(await fetchUsdPerUnit("NGN")).toBe(1 / NGN_PER_USD);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -126,6 +134,12 @@ describe("peekUsdPerUnit", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("answers NGN from the fixed rate without a request or a warm cache", () => {
+    const fetchMock = stubCandles({});
+    expect(peekUsdPerUnit("NGN")).toBe(1 / NGN_PER_USD);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("returns null for a cold currency, never fetching", () => {
     const fetchMock = stubCandles({ AUDUSD: 0.70599 });
     expect(peekUsdPerUnit("AUD")).toBeNull();
@@ -156,6 +170,16 @@ describe("fetchAccountPerQuoteUnit", () => {
       expect(fetchMock).not.toHaveBeenCalled();
     },
   );
+
+  it("converts USD into Naira at the fixed 1400 without a request", async () => {
+    const fetchMock = stubCandles({});
+
+    expect(await fetchAccountPerQuoteUnit("USD", "NGN")).toEqual({
+      rate: NGN_PER_USD,
+      missing: "none",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 
   it("leaves a USD account's rate bit-identical to the raw quote leg", async () => {
     stubCandles({ JPYUSD: 0.0063694 });

@@ -269,6 +269,29 @@ describe("calculateLotSize", () => {
       expect(result.roundedLots).toBeCloseTo(0.33, 6);
     });
 
+    it("converts a USD-quoted pair for a Naira account at 1400 NGN per USD", () => {
+      // Same 30 pip / $10,000 / 1% setup as the USD case, just denominated in
+      // Naira: ₦14,000,000 at 1% risks ₦140,000, which is 0.33 lots at ₦420,000
+      // per lot — identical size, different unit.
+      const result = calculateLotSize({
+        instrument: instrument("EUR/USD"),
+        accountCurrency: "NGN",
+        accountBalance: 14_000_000,
+        riskPercent: 1,
+        entryPrice: 1.0842,
+        stopLoss: 1.0812,
+        direction: "BUY",
+        quoteRateOverride: 1400,
+        quoteRateOrigin: "live",
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.quoteRateSource).toBe("live");
+      expect(result.riskAmount).toBeCloseTo(140_000, 6);
+      expect(result.riskPerLot).toBeCloseTo(420_000, 6);
+      expect(result.roundedLots).toBeCloseTo(0.33, 6);
+    });
+
     it("sizes against a crypto-denominated account", () => {
       // 0.25 BTC at 1% risk, converted at 1/95,000 BTC per USD.
       const result = calculateLotSize({
