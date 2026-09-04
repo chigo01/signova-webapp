@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fetchAccountPerQuoteUnit,
   fetchUsdPerUnit,
-  NGN_PER_USD,
   peekUsdPerUnit,
   resetQuoteRateCache,
 } from "./quote-rate";
@@ -58,11 +57,12 @@ describe("fetchUsdPerUnit", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("uses the fixed Naira rate instead of the candle feed", async () => {
+  it("loads the current Naira rate from the candle feed", async () => {
     const fetchMock = stubCandles({ USDNGN: 1600, NGNUSD: 0.0007 });
 
-    expect(await fetchUsdPerUnit("NGN")).toBe(1 / NGN_PER_USD);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await fetchUsdPerUnit("NGN")).toBe(0.0007);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toContain("pair=NGNUSD");
   });
 
   it("caches a resolved rate instead of refetching", async () => {
@@ -134,9 +134,9 @@ describe("peekUsdPerUnit", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("answers NGN from the fixed rate without a request or a warm cache", () => {
+  it("returns null for NGN until its live rate is cached", () => {
     const fetchMock = stubCandles({});
-    expect(peekUsdPerUnit("NGN")).toBe(1 / NGN_PER_USD);
+    expect(peekUsdPerUnit("NGN")).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -171,14 +171,14 @@ describe("fetchAccountPerQuoteUnit", () => {
     },
   );
 
-  it("converts USD into Naira at the fixed 1400 without a request", async () => {
-    const fetchMock = stubCandles({});
+  it("converts USD into Naira using the current candle rate", async () => {
+    const fetchMock = stubCandles({ USDNGN: 1600 });
 
     expect(await fetchAccountPerQuoteUnit("USD", "NGN")).toEqual({
-      rate: NGN_PER_USD,
+      rate: 1600,
       missing: "none",
     });
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("leaves a USD account's rate bit-identical to the raw quote leg", async () => {

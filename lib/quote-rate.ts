@@ -3,8 +3,7 @@
 // Sizing a cross pair (EUR/AUD, GBP/JPY) needs the USD value of its quote
 // currency, which the signal itself never carries. Rather than ask the user to
 // type it, we read it off the same public /candles endpoint the chart datafeed
-// uses — one extra 1-bar request per currency, cached for the session. NGN is
-// the exception: it never hits the feed and uses a fixed 1400 NGN per USD.
+// uses — one extra 1-bar request per currency, cached for the session.
 //
 // Pairs whose quote or base *is* the account currency never reach here:
 // lib/lot-size.ts resolves those from the entry price alone.
@@ -17,18 +16,6 @@
 const ADMIN_API_URL =
   process.env.NEXT_PUBLIC_ADMIN_API_URL ||
   "https://admin-server-syol.onrender.com";
-
-/**
- * Naira accounts are sized at a round 1400 NGN per 1 USD. Nigerian brokers
- * use that fixed figure rather than a live parallel-market quote, and the
- * candle feed has no USDNGN pair anyway.
- */
-export const NGN_PER_USD = 1400;
-
-/** USD per 1 unit of a currency that never hits the price feed. */
-const STATIC_USD_PER_UNIT: Record<string, number> = {
-  NGN: 1 / NGN_PER_USD,
-};
 
 /**
  * Rates move slowly relative to a calculator session, and a stale-by-minutes
@@ -89,8 +76,6 @@ export async function fetchUsdPerUnit(
 ): Promise<number | null> {
   const code = currency.toUpperCase();
   if (code === "USD") return 1;
-  const staticRate = STATIC_USD_PER_UNIT[code];
-  if (staticRate !== undefined) return staticRate;
   if (!/^[A-Z]{3}$/.test(code)) return null;
 
   const cached = cache.get(code);
@@ -124,8 +109,6 @@ export async function fetchUsdPerUnit(
 export function peekUsdPerUnit(currency: string): number | null {
   const code = currency.toUpperCase();
   if (code === "USD") return 1;
-  const staticRate = STATIC_USD_PER_UNIT[code];
-  if (staticRate !== undefined) return staticRate;
   const cached = cache.get(code);
   if (!cached || Date.now() - cached.fetchedAt >= CACHE_TTL_MS) return null;
   return cached.rate;

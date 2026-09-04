@@ -13,9 +13,8 @@ export interface AccountCurrency {
 
 /**
  * The currencies a trading account can be held in, in the order brokers
- * conventionally list them. Most fiat entries resolve on the price feed
- * (lib/quote-rate.ts); NGN uses a fixed 1400 NGN per USD because Nigerian
- * brokers size Naira accounts at that round number rather than a live quote.
+ * conventionally list them. Fiat entries, including NGN, resolve on the price
+ * feed (lib/quote-rate.ts) so changes in exchange rates affect position sizing.
  * BTC and ETH depend on the backend's crypto path and fall back to a typed
  * rate if it's unavailable.
  */
