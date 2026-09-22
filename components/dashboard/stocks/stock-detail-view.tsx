@@ -400,20 +400,21 @@ export function StockDetailView({ symbol, market = "US" }: Props) {
           </div>
         </header>
 
-        <div className="h-[min(62vh,720px)] min-h-[380px] w-full overflow-hidden rounded-lg border border-zinc-800 bg-[#0f0f0f]">
-          <TradingViewWidget
-            symbol={tvSymbol}
-            interval={CHART_INTERVAL}
-            timezone={
-              market === "NGX"
-                ? "Africa/Lagos"
-                : market === "KRX"
-                  ? "Asia/Seoul"
-                  : "Etc/UTC"
-            }
-            className="h-full"
-          />
-        </div>
+        {market === "KRX" ? (
+          <p className="rounded-lg border border-zinc-800 bg-[#090909] px-4 py-6 text-sm text-zinc-400">
+            Korea Exchange prices are shown above. An embedded chart is not
+            offered for these listings.
+          </p>
+        ) : (
+          <div className="h-[min(62vh,720px)] min-h-[380px] w-full overflow-hidden rounded-lg border border-zinc-800 bg-[#0f0f0f]">
+            <TradingViewWidget
+              symbol={tvSymbol}
+              interval={CHART_INTERVAL}
+              timezone={market === "NGX" ? "Africa/Lagos" : "Etc/UTC"}
+              className="h-full"
+            />
+          </div>
+        )}
 
         {market === "US" && stock && stock.reasons.length > 0 && (
           <section className="mt-8 rounded-lg border border-zinc-800 bg-zinc-950/50 p-5">

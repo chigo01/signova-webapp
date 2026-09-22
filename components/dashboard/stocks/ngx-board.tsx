@@ -1,9 +1,32 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import type { StockRecommendation } from "@/lib/stocks";
 import { stockDetailPath, type StockMarket } from "@/lib/markets";
-import { formatStockPrice, type StockCurrency } from "@/lib/stock-money";
+import {
+  formatAbsoluteMarketCap,
+  formatStockPrice,
+  type StockCurrency,
+} from "@/lib/stock-money";
+
+/** Gainers and losers shown under Today's Market Movers for one local board. */
+const MOVERS_PER_SIDE = 4;
+
+export function todaysBoardMovers(
+  stocks: StockRecommendation[],
+): StockRecommendation[] {
+  const priced = stocks.filter((stock) => stock.price > 0 && stock.changePercent !== 0);
+  const gainers = priced
+    .filter((stock) => stock.changePercent > 0)
+    .sort((a, b) => b.changePercent - a.changePercent)
+    .slice(0, MOVERS_PER_SIDE);
+  const losers = priced
+    .filter((stock) => stock.changePercent < 0)
+    .sort((a, b) => a.changePercent - b.changePercent)
+    .slice(0, MOVERS_PER_SIDE);
+  return [...gainers, ...losers];
+}
 
 interface BoardProps {
   title: string;
@@ -70,6 +93,11 @@ function BoardCard({
             H {formatStockPrice(stock.high, currency)} / L{" "}
             {formatStockPrice(stock.low, currency)}
           </div>
+          {stock.marketCap > 0 && (
+            <div className="text-xs text-zinc-500">
+              Market cap {formatAbsoluteMarketCap(stock.marketCap, currency)}
+            </div>
+          )}
         </>
       ) : (
         <p className="text-sm text-zinc-500">Price unavailable</p>
@@ -91,11 +119,40 @@ export function ExchangeBoard({
   error = null,
   onRetry,
 }: BoardProps) {
+  const [activeTab, setActiveTab] = useState<"listings" | "movers">("listings");
+  const movers = todaysBoardMovers(stocks);
+  const visible = activeTab === "movers" ? movers : stocks;
+
   return (
     <section className="mb-8">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-white">{title}</h2>
         <p className="mt-1 text-xs text-zinc-500">{description}</p>
+      </div>
+
+      <div className="mb-4 flex gap-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("listings")}
+          className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
+            activeTab === "listings"
+              ? "bg-zinc-700 text-white"
+              : "text-zinc-500 hover:text-zinc-300"
+          }`}
+        >
+          Listings ({stocks.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("movers")}
+          className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
+            activeTab === "movers"
+              ? "bg-zinc-700 text-white"
+              : "text-zinc-500 hover:text-zinc-300"
+          }`}
+        >
+          Today&apos;s Market Movers ({movers.length})
+        </button>
       </div>
 
       {loading ? (
@@ -104,10 +161,16 @@ export function ExchangeBoard({
             <div key={i} className="h-28 animate-pulse rounded-lg bg-zinc-800" />
           ))}
         </div>
-      ) : stocks.length === 0 ? (
+      ) : visible.length === 0 ? (
         <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-4 py-10 text-center text-sm text-zinc-500">
-          <p>{error ? errorMessage : emptyMessage}</p>
-          {error && onRetry && (
+          <p>
+            {activeTab === "movers" && stocks.length > 0
+              ? "No priced moves on this board yet."
+              : error
+                ? errorMessage
+                : emptyMessage}
+          </p>
+          {error && activeTab === "listings" && onRetry && (
             <button
               type="button"
               onClick={onRetry}
@@ -119,7 +182,7 @@ export function ExchangeBoard({
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {stocks.map((stock) => (
+          {visible.map((stock) => (
             <BoardCard
               key={stock.symbol}
               stock={stock}
@@ -136,7 +199,8 @@ export function ExchangeBoard({
 
 const NIGERIA_BOARD = {
   title: "Nigerian Exchange",
-  description: "Largest NGX listings, priced in naira. Open a name for its chart.",
+  description:
+    "Largest NGX listings, priced in naira. Today's Market Movers are the biggest gains and drops on this board.",
   badge: "NGX",
   market: "NGX" as const,
   currency: "NGN" as const,
@@ -146,7 +210,8 @@ const NIGERIA_BOARD = {
 
 const KOREA_BOARD = {
   title: "Korea Exchange",
-  description: "Largest KRX listings, priced in won. Open a name for its chart.",
+  description:
+    "Largest KRX listings, priced in won. Today's Market Movers are the biggest gains and drops on this board.",
   badge: "KRX",
   market: "KRX" as const,
   currency: "KRW" as const,

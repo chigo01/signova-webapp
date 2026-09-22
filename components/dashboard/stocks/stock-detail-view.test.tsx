@@ -145,5 +145,44 @@ describe("StockDetailView personal watchlist", () => {
     expect(screen.getByText(/News emails cover US listings only/i)).toBeInTheDocument();
     expect(screen.queryByText("ADX")).not.toBeInTheDocument();
     expect(screen.queryByText("Should stay hidden")).not.toBeInTheDocument();
+    expect(screen.getByTestId("chart")).toBeInTheDocument();
+  });
+
+  it("keeps the Korea quote and leaves out the embedded chart", async () => {
+    stocksMocks.fetchStockRecommendations.mockResolvedValue({
+      watchlist: [],
+      topMovers: [],
+      krx: [
+        {
+          symbol: "005930",
+          name: "Samsung Electronics Co., Ltd.",
+          price: 276500,
+          change: 2500,
+          changePercent: 0.91,
+          high: 283500,
+          low: 274500,
+          sector: "Electronic Technology",
+          marketCap: 1_740_780_000_000_000,
+          technicalSignal: "neutral",
+          technicalCount: { buy: 0, neutral: 0, sell: 0 },
+          adx: 0,
+          trending: false,
+          recommendation: "HOLD",
+          confidence: 0,
+          reasons: [],
+          market: "KRX",
+          currency: "KRW",
+        },
+      ],
+      lastUpdated: new Date().toISOString(),
+    });
+
+    render(<StockDetailView symbol="005930" market="KRX" />);
+
+    expect(await screen.findByText("005930")).toBeInTheDocument();
+    expect(
+      screen.getByText(/embedded chart is not offered/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("chart")).not.toBeInTheDocument();
   });
 });

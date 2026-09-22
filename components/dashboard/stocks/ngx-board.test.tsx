@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { StockRecommendation } from "@/lib/stocks";
 import { NgxBoard } from "./ngx-board";
@@ -45,6 +45,34 @@ describe("NgxBoard", () => {
       "/dashboard/stock-detail?ticker=DANGCEM&market=ngx",
     );
     expect(screen.queryByText("₦0.00")).not.toBeInTheDocument();
+  });
+
+  it("shows today's largest naira moves with market cap", () => {
+    const quieter = [0.1, 0.2, 0.3, 0.4].map((changePercent, index) => ({
+      ...dangcem,
+      symbol: `QUIET${index}`,
+      name: `Quiet ${index}`,
+      changePercent,
+      marketCap: 1_000_000_000,
+    }));
+    const drop = {
+      ...dangcem,
+      symbol: "ZENITH",
+      name: "Zenith Bank",
+      price: 40,
+      changePercent: -3.2,
+      marketCap: 2_000_000_000,
+    };
+    render(<NgxBoard stocks={[...quieter, dangcem, drop]} />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /today's market movers/i }),
+    );
+
+    expect(screen.getByText("DANGCEM")).toBeInTheDocument();
+    expect(screen.getByText("ZENITH")).toBeInTheDocument();
+    expect(screen.queryByText("QUIET0")).not.toBeInTheDocument();
+    expect(screen.getByText("Market cap ₦17.41T")).toBeInTheDocument();
   });
 
   it("says when the feed has no Nigerian board", () => {
