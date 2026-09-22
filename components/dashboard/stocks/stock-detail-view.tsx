@@ -13,8 +13,14 @@ import {
   type WatchlistResponse,
   type StockRecommendation,
 } from "@/lib/stocks";
-import { fetchUsStockQuote, type StockQuoteResult } from "@/lib/stock-quote";
-import { usTickerToTradingViewSymbol } from "@/lib/tradingview-us-stock";
+import { fetchNgxQuote, fetchUsStockQuote, type StockQuoteResult } from "@/lib/stock-quote";
+import { tickerToTradingViewSymbol } from "@/lib/tradingview-us-stock";
+import type { StockMarket } from "@/lib/ngx";
+import {
+  formatNgnMarketCap,
+  formatStockPrice,
+  formatUsdMarketCapMillions,
+} from "@/lib/stock-money";
 import { cn } from "@/lib/utils";
 
 const QUOTE_POLL_MS = 15_000;
@@ -22,27 +28,17 @@ const QUOTE_POLL_MS = 15_000;
 /** Default chart interval when no timeframe UI (users can still change in TradingView). */
 const CHART_INTERVAL = "D";
 
-/** `marketCap` from API is in millions of USD */
-function formatMarketCapMillions(millions: number): string {
-  if (!Number.isFinite(millions) || millions <= 0) return "—";
-  if (millions >= 1_000_000) {
-    return `$${(millions / 1_000_000).toFixed(2)}T`;
-  }
-  if (millions >= 1_000) {
-    return `$${(millions / 1_000).toFixed(2)}B`;
-  }
-  return `$${millions.toFixed(0)}M`;
-}
-
 interface Props {
   symbol: string;
+  market?: StockMarket;
 }
 
-export function StockDetailView({ symbol }: Props) {
+export function StockDetailView({ symbol, market = "US" }: Props) {
   const ticker = useMemo(
     () => decodeURIComponent(symbol).trim().toUpperCase(),
     [symbol]
   );
+  const currency = market === "NGX" ? "NGN" : "USD";
 
   const [stock, setStock] = useState<StockRecommendation | null>(null);
   const [stockLoading, setStockLoading] = useState(true);
@@ -54,7 +50,10 @@ export function StockDetailView({ symbol }: Props) {
   const [watchlistSaving, setWatchlistSaving] = useState(false);
   const [watchlistError, setWatchlistError] = useState<string | null>(null);
   const [showAlertSetup, setShowAlertSetup] = useState(false);
-  const tvSymbol = useMemo(() => usTickerToTradingViewSymbol(ticker), [ticker]);
+  const tvSymbol = useMemo(
+    () => tickerToTradingViewSymbol(ticker, market),
+    [ticker, market],
+  );
 
   const loadStock = useCallback(async () => {
     if (!ticker) {
@@ -65,7 +64,10 @@ export function StockDetailView({ symbol }: Props) {
     try {
       setStockLoading(true);
       const data = await fetchStockRecommendations();
-      const all = [...(data.watchlist ?? []), ...(data.topMovers ?? [])];
+      const all =
+        market === "NGX"
+          ? (data.ngx ?? [])
+          : [...(data.watchlist ?? []), ...(data.topMovers ?? [])];
       const found =
         all.find((s) => s.symbol.toUpperCase() === ticker) ?? null;
       setStock(found);
@@ -74,7 +76,7 @@ export function StockDetailView({ symbol }: Props) {
     } finally {
       setStockLoading(false);
     }
-  }, [ticker]);
+  }, [market, ticker]);
 
   useEffect(() => {
     void loadStock();
@@ -106,7 +108,10 @@ export function StockDetailView({ symbol }: Props) {
 
     const tick = async () => {
       try {
-        const q = await fetchUsStockQuote(ticker);
+        const q =
+          market === "NGX"
+            ? await fetchNgxQuote(ticker)
+            : await fetchUsStockQuote(ticker);
         if (!cancelled && q) setQuote(q);
       } finally {
         if (first && !cancelled) {
@@ -122,9 +127,14 @@ export function StockDetailView({ symbol }: Props) {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [ticker]);
+  }, [market, ticker]);
 
-  const displayPrice = quote?.price ?? stock?.price;
+  const displayPrice =
+    quote?.price && quote.price > 0
+      ? quote.price
+      : stock?.price && stock.price > 0
+        ? stock.price
+        : undefined;
   const changeAbs = quote?.change ?? stock?.change;
   const changePct = quote?.changePercent ?? stock?.changePercent;
 
@@ -242,7 +252,9 @@ export function StockDetailView({ symbol }: Props) {
               <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
                 {stock?.sector && stock.sector !== "N/A"
                   ? stock.sector
-                  : "US equity"}
+                  : market === "NGX"
+                    ? "Nigerian Exchange"
+                    : "US equity"}
               </p>
               <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
                 <span className="text-white">{ticker}</span>
@@ -262,7 +274,7 @@ export function StockDetailView({ symbol }: Props) {
                         aria-live="polite"
                         aria-atomic="true"
                       >
-                        ${displayPrice.toFixed(2)}
+                        {formatStockPrice(displayPrice, currency)}
                       </span>
                       {changeAbs != null && changePct != null && (
                         <span className={`text-sm font-medium ${priceColor}`}>
@@ -282,13 +294,24 @@ export function StockDetailView({ symbol }: Props) {
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-zinc-600">
-                  {hasLiveQuote && (
-                    <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-medium text-emerald-400/90">
-                      Live
+                  {market === "NGX" ? (
+                    <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-medium text-zinc-300">
+                      NGX
                     </span>
+                  ) : (
+                    hasLiveQuote && (
+                      <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-medium text-emerald-400/90">
+                        Live
+                      </span>
+                    )
                   )}
                   <span>Refreshes every {QUOTE_POLL_MS / 1000}s</span>
                 </div>
+                {market === "NGX" && (
+                  <p className="mt-2 max-w-md text-xs text-zinc-500">
+                    News emails cover US listings only.
+                  </p>
+                )}
               </div>
 
               {!stock && !stockLoading && (
@@ -332,28 +355,36 @@ export function StockDetailView({ symbol }: Props) {
                 </div>
               ) : stock ? (
                 <div className="grid w-full grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-3">
-                <Stat label="Day high" value={`$${stock.high.toFixed(2)}`} />
-                <Stat label="Day low" value={`$${stock.low.toFixed(2)}`} />
+                <Stat label="Day high" value={formatStockPrice(stock.high, currency)} />
+                <Stat label="Day low" value={formatStockPrice(stock.low, currency)} />
                 <Stat
                   label="Market cap"
-                  value={formatMarketCapMillions(stock.marketCap)}
-                />
-                <Stat label="ADX" value={String(stock.adx)} />
-                <Stat
-                  label="Trend"
-                  value={stock.trending ? "Trending" : "Range"}
-                />
-                <Stat
-                  label="Signal"
-                  value={stock.recommendation}
-                  valueClass={
-                    stock.recommendation === "BUY"
-                      ? "text-emerald-400"
-                      : stock.recommendation === "SELL"
-                        ? "text-red-400"
-                        : "text-zinc-300"
+                  value={
+                    currency === "NGN"
+                      ? formatNgnMarketCap(stock.marketCap)
+                      : formatUsdMarketCapMillions(stock.marketCap)
                   }
                 />
+                {market === "US" && (
+                  <>
+                    <Stat label="ADX" value={String(stock.adx)} />
+                    <Stat
+                      label="Trend"
+                      value={stock.trending ? "Trending" : "Range"}
+                    />
+                    <Stat
+                      label="Signal"
+                      value={stock.recommendation}
+                      valueClass={
+                        stock.recommendation === "BUY"
+                          ? "text-emerald-400"
+                          : stock.recommendation === "SELL"
+                            ? "text-red-400"
+                            : "text-zinc-300"
+                      }
+                    />
+                  </>
+                )}
                 </div>
               ) : null}
               {watchlistError && (
@@ -369,11 +400,12 @@ export function StockDetailView({ symbol }: Props) {
           <TradingViewWidget
             symbol={tvSymbol}
             interval={CHART_INTERVAL}
+            timezone={market === "NGX" ? "Africa/Lagos" : "Etc/UTC"}
             className="h-full"
           />
         </div>
 
-        {stock && stock.reasons.length > 0 && (
+        {market === "US" && stock && stock.reasons.length > 0 && (
           <section className="mt-8 rounded-lg border border-zinc-800 bg-zinc-950/50 p-5">
             <h2 className="mb-3 text-sm font-semibold text-zinc-300">
               Analysis notes

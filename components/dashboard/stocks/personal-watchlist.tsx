@@ -9,6 +9,7 @@ import {
   setActivePersonalWatchlistStocks,
   type WatchlistResponse,
 } from "@/lib/stocks";
+import { isNgxTicker, stockDetailPath } from "@/lib/ngx";
 import { getAuthToken } from "@/lib/cookies";
 
 function formatDeliveryTime(value: string, timeZone: string): string {
@@ -174,7 +175,10 @@ export function PersonalWatchlist() {
                 className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-black/50 p-3"
               >
                 <Link
-                  href={`/dashboard/stock-detail?ticker=${encodeURIComponent(item.symbol)}`}
+                  href={stockDetailPath(
+                    item.symbol,
+                    item.market === "NGX" || isNgxTicker(item.symbol) ? "NGX" : "US",
+                  )}
                   className="min-w-0 flex-1"
                 >
                   <span className="block font-semibold text-white">{item.symbol}</span>

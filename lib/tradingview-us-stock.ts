@@ -1,3 +1,5 @@
+import type { StockMarket } from "@/lib/ngx";
+
 /**
  * Map US ticker (e.g. MSFT) to a TradingView symbol for the advanced chart widget.
  *
@@ -5,6 +7,9 @@
  * primary listing. Hardcoding an exchange prefix (e.g. NASDAQ:) breaks NYSE-listed names
  * (RBLX, SPOT, F, ...) and goes stale when a stock changes exchange (e.g. PLTR NYSE→NASDAQ).
  * ETFs / indices keep an explicit AMEX prefix where bare resolution is more ambiguous.
+ *
+ * Nigerian listings must keep the NSENG prefix. A bare ticker resolves to the US
+ * primary listing, or to nothing.
  */
 const ARCA = new Set([
   "SPY",
@@ -25,4 +30,13 @@ export function usTickerToTradingViewSymbol(ticker: string): string {
 
   if (ARCA.has(s)) return `AMEX:${s}`;
   return s; // bare symbol; TradingView resolves to the primary listing
+}
+
+export function tickerToTradingViewSymbol(
+  ticker: string,
+  market: StockMarket = "US",
+): string {
+  const s = ticker.trim().toUpperCase();
+  if (market === "NGX") return s ? `NSENG:${s}` : "NSENG:DANGCEM";
+  return usTickerToTradingViewSymbol(s);
 }

@@ -8,12 +8,15 @@ type TradingViewWidgetProps = {
   symbol?: string;
   /** TradingView interval like "1", "5", "60", "D", "W" */
   interval?: string;
+  /** IANA zone passed to the embed, e.g. Africa/Lagos for NGX. */
+  timezone?: string;
   className?: string;
 };
 
 function TradingViewWidget({
   symbol = "OANDA:EURUSD",
   interval = "D",
+  timezone = "Etc/UTC",
   className,
 }: TradingViewWidgetProps) {
   const container = useRef<HTMLDivElement | null>(null);
@@ -64,7 +67,7 @@ function TradingViewWidget({
           "style": "1",
           "symbol": ${JSON.stringify(symbol)},
           "theme": "dark",
-          "timezone": "Etc/UTC",
+          "timezone": ${JSON.stringify(timezone)},
           "backgroundColor": "#0F0F0F",
           "gridColor": "rgba(242, 242, 242, 0.06)",
           "watchlist": [],
@@ -130,7 +133,7 @@ function TradingViewWidget({
       if (timeoutId) window.clearTimeout(timeoutId);
       if (container.current) container.current.innerHTML = "";
     };
-  }, [symbol, interval]);
+  }, [symbol, interval, timezone]);
 
   return (
     <div

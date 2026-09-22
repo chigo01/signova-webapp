@@ -9,6 +9,8 @@ import { TopNewsList } from "@/components/dashboard/stocks/top-news-list";
 import { TopGainers } from "@/components/dashboard/stocks/top-gainers";
 import { RecommendationsGrid } from "@/components/dashboard/stocks/recommendations-grid";
 import { PersonalWatchlist } from "@/components/dashboard/stocks/personal-watchlist";
+import { NgxBoard } from "@/components/dashboard/stocks/ngx-board";
+import { isNgxTicker, stockDetailPath } from "@/lib/ngx";
 import {
   fetchStockRecommendations,
   fetchTopNews,
@@ -25,6 +27,7 @@ import { relativeTime } from "@/lib/time";
 const emptyData: StockRecommendationsResponse = {
   watchlist: [],
   topMovers: [],
+  ngx: [],
   lastUpdated: new Date().toISOString(),
 };
 
@@ -64,8 +67,9 @@ export function StocksPageContent() {
     return {
       watchlist: filterStocks(data.watchlist, searchQuery),
       topMovers: filterStocks(data.topMovers, searchQuery),
+      ngx: filterStocks(data.ngx ?? [], searchQuery),
     };
-  }, [data.watchlist, data.topMovers, searchQuery]);
+  }, [data.watchlist, data.topMovers, data.ngx, searchQuery]);
 
   const load = useCallback(async ({ background = false } = {}) => {
     // Background refreshes keep the cached data on screen (no spinner).
@@ -124,13 +128,30 @@ export function StocksPageContent() {
   }, [load]);
 
   const openTickerFromSearch = useCallback(() => {
-    const raw = searchQuery.trim().toUpperCase();
-    const ticker = raw.replace(/[^A-Z0-9.-]/g, "");
+    const raw = searchQuery.trim();
+    const q = raw.toLowerCase();
+    const pools = [
+      ...(data.ngx ?? []).map((stock) => ({ ...stock, market: "NGX" as const })),
+      ...data.watchlist.map((stock) => ({
+        ...stock,
+        market: stock.market === "NGX" ? ("NGX" as const) : ("US" as const),
+      })),
+      ...data.topMovers.map((stock) => ({
+        ...stock,
+        market: stock.market === "NGX" ? ("NGX" as const) : ("US" as const),
+      })),
+    ];
+    const hit =
+      pools.find((stock) => stock.symbol.toLowerCase() === q) ??
+      pools.find((stock) => stock.name.toLowerCase() === q);
+    if (hit) {
+      router.push(stockDetailPath(hit.symbol, hit.market));
+      return;
+    }
+    const ticker = raw.toUpperCase().replace(/[^A-Z0-9.-]/g, "");
     if (!ticker) return;
-    router.push(
-      `/dashboard/stock-detail?ticker=${encodeURIComponent(ticker)}`
-    );
-  }, [router, searchQuery]);
+    router.push(stockDetailPath(ticker, isNgxTicker(ticker) ? "NGX" : "US"));
+  }, [data.ngx, data.topMovers, data.watchlist, router, searchQuery]);
 
   return (
     <div className="min-h-screen flex-1 overflow-y-auto overflow-x-hidden bg-black px-4 py-6 sm:px-6 lg:px-8">
@@ -176,6 +197,8 @@ export function StocksPageContent() {
           onRetry={() => void load()}
         />
       </section>
+
+      <NgxBoard stocks={filtered.ngx} loading={loading} error={error} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="lg:col-span-4">

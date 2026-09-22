@@ -6,11 +6,13 @@ import Link from "next/link";
 import { Loader2, Lock } from "lucide-react";
 import { StockDetailView } from "@/components/dashboard/stocks/stock-detail-view";
 import { useAuthState } from "@/components/auth/auth-provider";
+import { stockMarketOf } from "@/lib/ngx";
 
 function StockDetailGate() {
   const searchParams = useSearchParams();
   const { isGuest, promptAuth } = useAuthState();
   const ticker = searchParams.get("ticker")?.trim() ?? "";
+  const market = stockMarketOf(ticker, searchParams.get("market"));
 
   // Viewing a stock's detail is a payoff action — gate it for guests instead of
   // mounting the (authed) detail view.
@@ -60,7 +62,7 @@ function StockDetailGate() {
     );
   }
 
-  return <StockDetailView symbol={ticker} />;
+  return <StockDetailView symbol={ticker} market={market} />;
 }
 
 export default function StockDetailPage() {

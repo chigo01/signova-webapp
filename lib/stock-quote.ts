@@ -102,3 +102,34 @@ export async function fetchUsStockQuote(
     (await tryStooq(t))
   );
 }
+
+/** Nigerian Exchange quote. Does not fall through to US quote sources. */
+export async function fetchNgxQuote(
+  ticker: string,
+): Promise<StockQuoteResult | null> {
+  const t = ticker.trim().toUpperCase();
+  if (!t) return null;
+  try {
+    const token = getAuthToken();
+    const res = await fetch(
+      `${API_URL}/stocks/quote/${encodeURIComponent(t)}?market=ngx`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      },
+    );
+    if (!res.ok) return null;
+    const j = (await res.json()) as Record<string, unknown>;
+    const price = parseNum(j.price);
+    if (price === undefined || price <= 0) return null;
+    return {
+      price,
+      change: parseNum(j.change),
+      changePercent: parseNum(j.changePercent),
+    };
+  } catch {
+    return null;
+  }
+}

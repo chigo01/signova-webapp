@@ -12,9 +12,11 @@ const stocksMocks = vi.hoisted(() => ({
 vi.mock("@/lib/stocks", () => stocksMocks);
 vi.mock("@/lib/stock-quote", () => ({
   fetchUsStockQuote: vi.fn().mockResolvedValue(null),
+  fetchNgxQuote: vi.fn().mockResolvedValue(null),
 }));
 vi.mock("@/lib/tradingview-us-stock", () => ({
   usTickerToTradingViewSymbol: (symbol: string) => `NASDAQ:${symbol}`,
+  tickerToTradingViewSymbol: (symbol: string) => `NASDAQ:${symbol}`,
 }));
 vi.mock("@/components/signals/tradingview-widget", () => ({
   default: () => <div data-testid="chart" />,
@@ -105,5 +107,43 @@ describe("StockDetailView personal watchlist", () => {
     expect(
       await screen.findByRole("button", { name: /saved to watchlist/i }),
     ).toBeInTheDocument();
+  });
+
+  it("shows a Nigerian listing in naira without a US signal", async () => {
+    stocksMocks.fetchStockRecommendations.mockResolvedValue({
+      watchlist: [],
+      topMovers: [],
+      ngx: [
+        {
+          symbol: "DANGCEM",
+          name: "Dangote Cement PLC",
+          price: 1050,
+          change: 16,
+          changePercent: 1.55,
+          high: 1060,
+          low: 1040,
+          sector: "Non-Energy Minerals",
+          marketCap: 17_414_465_332_031,
+          technicalSignal: "neutral",
+          technicalCount: { buy: 0, neutral: 0, sell: 0 },
+          adx: 0,
+          trending: false,
+          recommendation: "HOLD",
+          confidence: 0,
+          reasons: ["Should stay hidden"],
+          market: "NGX",
+          currency: "NGN",
+        },
+      ],
+      lastUpdated: new Date().toISOString(),
+    });
+
+    render(<StockDetailView symbol="DANGCEM" market="NGX" />);
+
+    expect(await screen.findByText("₦1,050.00")).toBeInTheDocument();
+    expect(screen.getByText("₦17.41T")).toBeInTheDocument();
+    expect(screen.getByText(/News emails cover US listings only/i)).toBeInTheDocument();
+    expect(screen.queryByText("ADX")).not.toBeInTheDocument();
+    expect(screen.queryByText("Should stay hidden")).not.toBeInTheDocument();
   });
 });
