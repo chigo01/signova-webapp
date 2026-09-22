@@ -13,11 +13,11 @@ import {
   type WatchlistResponse,
   type StockRecommendation,
 } from "@/lib/stocks";
-import { fetchNgxQuote, fetchUsStockQuote, type StockQuoteResult } from "@/lib/stock-quote";
+import { fetchMarketQuote, fetchUsStockQuote, type StockQuoteResult } from "@/lib/stock-quote";
 import { tickerToTradingViewSymbol } from "@/lib/tradingview-us-stock";
-import type { StockMarket } from "@/lib/ngx";
+import type { StockMarket } from "@/lib/markets";
 import {
-  formatNgnMarketCap,
+  formatAbsoluteMarketCap,
   formatStockPrice,
   formatUsdMarketCapMillions,
 } from "@/lib/stock-money";
@@ -38,7 +38,7 @@ export function StockDetailView({ symbol, market = "US" }: Props) {
     () => decodeURIComponent(symbol).trim().toUpperCase(),
     [symbol]
   );
-  const currency = market === "NGX" ? "NGN" : "USD";
+  const currency = market === "NGX" ? "NGN" : market === "KRX" ? "KRW" : "USD";
 
   const [stock, setStock] = useState<StockRecommendation | null>(null);
   const [stockLoading, setStockLoading] = useState(true);
@@ -67,7 +67,9 @@ export function StockDetailView({ symbol, market = "US" }: Props) {
       const all =
         market === "NGX"
           ? (data.ngx ?? [])
-          : [...(data.watchlist ?? []), ...(data.topMovers ?? [])];
+          : market === "KRX"
+            ? (data.krx ?? [])
+            : [...(data.watchlist ?? []), ...(data.topMovers ?? [])];
       const found =
         all.find((s) => s.symbol.toUpperCase() === ticker) ?? null;
       setStock(found);
@@ -109,9 +111,9 @@ export function StockDetailView({ symbol, market = "US" }: Props) {
     const tick = async () => {
       try {
         const q =
-          market === "NGX"
-            ? await fetchNgxQuote(ticker)
-            : await fetchUsStockQuote(ticker);
+          market === "US"
+            ? await fetchUsStockQuote(ticker)
+            : await fetchMarketQuote(ticker, market);
         if (!cancelled && q) setQuote(q);
       } finally {
         if (first && !cancelled) {
@@ -254,7 +256,9 @@ export function StockDetailView({ symbol, market = "US" }: Props) {
                   ? stock.sector
                   : market === "NGX"
                     ? "Nigerian Exchange"
-                    : "US equity"}
+                    : market === "KRX"
+                      ? "Korea Exchange"
+                      : "US equity"}
               </p>
               <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
                 <span className="text-white">{ticker}</span>
@@ -294,9 +298,9 @@ export function StockDetailView({ symbol, market = "US" }: Props) {
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-zinc-600">
-                  {market === "NGX" ? (
+                  {market !== "US" ? (
                     <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-medium text-zinc-300">
-                      NGX
+                      {market}
                     </span>
                   ) : (
                     hasLiveQuote && (
@@ -307,7 +311,7 @@ export function StockDetailView({ symbol, market = "US" }: Props) {
                   )}
                   <span>Refreshes every {QUOTE_POLL_MS / 1000}s</span>
                 </div>
-                {market === "NGX" && (
+                {market !== "US" && (
                   <p className="mt-2 max-w-md text-xs text-zinc-500">
                     News emails cover US listings only.
                   </p>
@@ -360,9 +364,9 @@ export function StockDetailView({ symbol, market = "US" }: Props) {
                 <Stat
                   label="Market cap"
                   value={
-                    currency === "NGN"
-                      ? formatNgnMarketCap(stock.marketCap)
-                      : formatUsdMarketCapMillions(stock.marketCap)
+                    currency === "USD"
+                      ? formatUsdMarketCapMillions(stock.marketCap)
+                      : formatAbsoluteMarketCap(stock.marketCap, currency)
                   }
                 />
                 {market === "US" && (
@@ -400,7 +404,13 @@ export function StockDetailView({ symbol, market = "US" }: Props) {
           <TradingViewWidget
             symbol={tvSymbol}
             interval={CHART_INTERVAL}
-            timezone={market === "NGX" ? "Africa/Lagos" : "Etc/UTC"}
+            timezone={
+              market === "NGX"
+                ? "Africa/Lagos"
+                : market === "KRX"
+                  ? "Asia/Seoul"
+                  : "Etc/UTC"
+            }
             className="h-full"
           />
         </div>

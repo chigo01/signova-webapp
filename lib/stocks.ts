@@ -19,14 +19,15 @@ export interface StockRecommendation {
   recommendation: "BUY" | "HOLD" | "SELL";
   confidence: number;
   reasons: string[];
-  market?: "US" | "NGX";
-  currency?: "USD" | "NGN";
+  market?: "US" | "NGX" | "KRX";
+  currency?: "USD" | "NGN" | "KRW";
 }
 
 export interface StockRecommendationsResponse {
   watchlist: StockRecommendation[];
   topMovers: StockRecommendation[];
   ngx?: StockRecommendation[];
+  krx?: StockRecommendation[];
   lastUpdated: string;
 }
 
@@ -50,7 +51,7 @@ export type StockNewsDeliveryMode = "off" | "immediate" | "daily";
 
 export interface WatchlistItem {
   symbol: string;
-  market?: "US" | "NGX";
+  market?: "US" | "NGX" | "KRX";
   companyName?: string;
   status: "active" | "plan_paused";
   alertsActiveSince: string;

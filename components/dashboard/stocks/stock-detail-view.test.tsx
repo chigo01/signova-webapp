@@ -12,7 +12,7 @@ const stocksMocks = vi.hoisted(() => ({
 vi.mock("@/lib/stocks", () => stocksMocks);
 vi.mock("@/lib/stock-quote", () => ({
   fetchUsStockQuote: vi.fn().mockResolvedValue(null),
-  fetchNgxQuote: vi.fn().mockResolvedValue(null),
+  fetchMarketQuote: vi.fn().mockResolvedValue(null),
 }));
 vi.mock("@/lib/tradingview-us-stock", () => ({
   usTickerToTradingViewSymbol: (symbol: string) => `NASDAQ:${symbol}`,

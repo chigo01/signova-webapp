@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { isNgxTicker, stockDetailPath, stockMarketOf } from "./ngx";
+import { isNgxTicker } from "./ngx";
+import { isKrxTicker } from "./krx";
+import { stockDetailPath, stockMarketOf } from "./markets";
 import { tickerToTradingViewSymbol } from "./tradingview-us-stock";
 import {
   formatNgnMarketCap,
@@ -14,10 +16,16 @@ describe("Nigerian listings", () => {
     expect(tickerToTradingViewSymbol("DANGCEM", "NGX")).toBe("NSENG:DANGCEM");
     expect(tickerToTradingViewSymbol("AAPL")).toBe("AAPL");
     expect(tickerToTradingViewSymbol("SPY")).toBe("AMEX:SPY");
+    expect(isKrxTicker("005930")).toBe(true);
+    expect(tickerToTradingViewSymbol("005930", "KRX")).toBe("KRX:005930");
     expect(stockMarketOf("DANGCEM", null)).toBe("NGX");
+    expect(stockMarketOf("005930", null)).toBe("KRX");
     expect(stockMarketOf("DANGCEM", "us")).toBe("US");
     expect(stockDetailPath("DANGCEM", "NGX")).toBe(
       "/dashboard/stock-detail?ticker=DANGCEM&market=ngx",
+    );
+    expect(stockDetailPath("005930", "KRX")).toBe(
+      "/dashboard/stock-detail?ticker=005930&market=krx",
     );
   });
 
@@ -27,6 +35,7 @@ describe("Nigerian listings", () => {
     expect(formatStockPrice(0, "NGN")).toBe("—");
     expect(formatStockPrice(189.5)).toBe("$189.50");
     expect(formatNgnMarketCap(17_414_465_332_031)).toBe("₦17.41T");
+    expect(formatStockPrice(276500, "KRW")).toBe("₩276,500");
     expect(formatUsdMarketCapMillions(1000)).toBe("$1.00B");
   });
 });

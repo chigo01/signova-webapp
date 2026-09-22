@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Loader2, Lock } from "lucide-react";
 import { StockDetailView } from "@/components/dashboard/stocks/stock-detail-view";
 import { useAuthState } from "@/components/auth/auth-provider";
-import { stockMarketOf } from "@/lib/ngx";
+import { stockMarketOf } from "@/lib/markets";
 
 function StockDetailGate() {
   const searchParams = useSearchParams();

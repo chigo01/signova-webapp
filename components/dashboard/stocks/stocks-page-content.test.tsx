@@ -68,6 +68,28 @@ const sample = {
       currency: "NGN" as const,
     },
   ],
+  krx: [
+    {
+      symbol: "005930",
+      name: "Samsung Electronics Co., Ltd.",
+      price: 276500,
+      change: 3300,
+      changePercent: 1.2,
+      high: 278000,
+      low: 270000,
+      sector: "Electronic Technology",
+      marketCap: 1_740_782_914_062_500,
+      technicalSignal: "neutral",
+      technicalCount: { buy: 0, neutral: 0, sell: 0 },
+      adx: 0,
+      trending: false,
+      recommendation: "HOLD" as const,
+      confidence: 0,
+      reasons: [],
+      market: "KRX" as const,
+      currency: "KRW" as const,
+    },
+  ],
   lastUpdated: "2026-09-22T10:00:00.000Z",
 };
 
@@ -92,12 +114,21 @@ describe("Stocks page market menu", () => {
     expect(screen.queryByRole("heading", { name: "Nigerian Exchange" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Top News" })).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Market"), { target: { value: "NGX" } });
+    fireEvent.click(screen.getByRole("button", { name: "Market" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Nigeria" }));
 
     expect(screen.getByRole("heading", { name: "Nigerian Exchange" })).toBeInTheDocument();
     expect(screen.getByText("DANGCEM")).toBeInTheDocument();
     expect(screen.getByText("₦1,050.00")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "AI Stock Signals" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Top News" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Market" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "South Korea" }));
+
+    expect(screen.getByRole("heading", { name: "Korea Exchange" })).toBeInTheDocument();
+    expect(screen.getByText("005930")).toBeInTheDocument();
+    expect(screen.getByText("₩276,500")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Nigerian Exchange" })).not.toBeInTheDocument();
   });
 });

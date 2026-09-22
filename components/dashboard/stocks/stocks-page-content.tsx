@@ -9,8 +9,11 @@ import { TopNewsList } from "@/components/dashboard/stocks/top-news-list";
 import { TopGainers } from "@/components/dashboard/stocks/top-gainers";
 import { RecommendationsGrid } from "@/components/dashboard/stocks/recommendations-grid";
 import { PersonalWatchlist } from "@/components/dashboard/stocks/personal-watchlist";
-import { NgxBoard } from "@/components/dashboard/stocks/ngx-board";
-import { isNgxTicker, stockDetailPath, type StockMarket } from "@/lib/ngx";
+import { ExchangeBoard, boardCopy } from "@/components/dashboard/stocks/ngx-board";
+import { MarketMenu } from "@/components/dashboard/stocks/market-menu";
+import { isNgxTicker } from "@/lib/ngx";
+import { isKrxTicker } from "@/lib/krx";
+import { stockDetailPath, type StockMarket } from "@/lib/markets";
 import {
   fetchStockRecommendations,
   fetchTopNews,
@@ -28,6 +31,7 @@ const emptyData: StockRecommendationsResponse = {
   watchlist: [],
   topMovers: [],
   ngx: [],
+  krx: [],
   lastUpdated: new Date().toISOString(),
 };
 
@@ -35,7 +39,8 @@ const MARKET_STORAGE_KEY = "signova.stockMarket";
 
 function readStoredMarket(): StockMarket {
   if (typeof window === "undefined") return "US";
-  return window.sessionStorage.getItem(MARKET_STORAGE_KEY) === "NGX" ? "NGX" : "US";
+  const stored = window.sessionStorage.getItem(MARKET_STORAGE_KEY);
+  return stored === "NGX" || stored === "KRX" ? stored : "US";
 }
 
 function filterStocks(
@@ -76,8 +81,9 @@ export function StocksPageContent() {
       watchlist: filterStocks(data.watchlist, searchQuery),
       topMovers: filterStocks(data.topMovers, searchQuery),
       ngx: filterStocks(data.ngx ?? [], searchQuery),
+      krx: filterStocks(data.krx ?? [], searchQuery),
     };
-  }, [data.watchlist, data.topMovers, data.ngx, searchQuery]);
+  }, [data.watchlist, data.topMovers, data.ngx, data.krx, searchQuery]);
 
   const load = useCallback(async ({ background = false } = {}) => {
     // Background refreshes keep the cached data on screen (no spinner).
@@ -144,14 +150,17 @@ export function StocksPageContent() {
     const raw = searchQuery.trim();
     const q = raw.toLowerCase();
     const pools = [
+      ...(data.krx ?? []).map((stock) => ({ ...stock, market: "KRX" as const })),
       ...(data.ngx ?? []).map((stock) => ({ ...stock, market: "NGX" as const })),
       ...data.watchlist.map((stock) => ({
         ...stock,
-        market: stock.market === "NGX" ? ("NGX" as const) : ("US" as const),
+        market:
+          stock.market === "NGX" || stock.market === "KRX" ? stock.market : ("US" as const),
       })),
       ...data.topMovers.map((stock) => ({
         ...stock,
-        market: stock.market === "NGX" ? ("NGX" as const) : ("US" as const),
+        market:
+          stock.market === "NGX" || stock.market === "KRX" ? stock.market : ("US" as const),
       })),
     ];
     const hit =
@@ -163,38 +172,36 @@ export function StocksPageContent() {
     }
     const ticker = raw.toUpperCase().replace(/[^A-Z0-9.-]/g, "");
     if (!ticker) return;
-    router.push(stockDetailPath(ticker, isNgxTicker(ticker) ? "NGX" : "US"));
-  }, [data.ngx, data.topMovers, data.watchlist, router, searchQuery]);
+    router.push(
+      stockDetailPath(
+        ticker,
+        isKrxTicker(ticker) ? "KRX" : isNgxTicker(ticker) ? "NGX" : "US",
+      ),
+    );
+  }, [data.krx, data.ngx, data.topMovers, data.watchlist, router, searchQuery]);
 
+  const visibleCount =
+    market === "KRX"
+      ? filtered.krx.length
+      : market === "NGX"
+        ? filtered.ngx.length
+        : filtered.watchlist.length + filtered.topMovers.length;
+  const otherMarkets = (
+    [
+      { next: "US" as const, label: "Show United States", count: filtered.watchlist.length + filtered.topMovers.length },
+      { next: "NGX" as const, label: "Show Nigeria", count: filtered.ngx.length },
+      { next: "KRX" as const, label: "Show South Korea", count: filtered.krx.length },
+    ] as const
+  ).filter((option) => option.next !== market && option.count > 0);
   const otherMarket =
-    searchQuery.trim() && market === "US" && filtered.ngx.length > 0 &&
-    filtered.watchlist.length === 0 &&
-    filtered.topMovers.length === 0
-      ? { next: "NGX" as const, label: "Show Nigeria" }
-      : searchQuery.trim() &&
-          market === "NGX" &&
-          filtered.ngx.length === 0 &&
-          (filtered.watchlist.length > 0 || filtered.topMovers.length > 0)
-        ? { next: "US" as const, label: "Show United States" }
-        : null;
+    searchQuery.trim() && visibleCount === 0 ? otherMarkets[0] ?? null : null;
 
   return (
     <div className="min-h-screen flex-1 overflow-y-auto overflow-x-hidden bg-black px-4 py-6 sm:px-6 lg:px-8">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-semibold text-white">Stock options</h1>
-          <select
-            id="stock-market"
-            value={market}
-            onChange={(event) =>
-              chooseMarket(event.target.value === "NGX" ? "NGX" : "US")
-            }
-            aria-label="Market"
-            className="h-9 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-sm text-white outline-none focus:border-zinc-500"
-          >
-            <option value="US">United States</option>
-            <option value="NGX">Nigeria</option>
-          </select>
+          <MarketMenu value={market} onChange={chooseMarket} />
         </div>
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
@@ -226,9 +233,10 @@ export function StocksPageContent() {
 
       <PersonalWatchlist />
 
-      {market === "NGX" ? (
-        <NgxBoard
-          stocks={filtered.ngx}
+      {market === "NGX" || market === "KRX" ? (
+        <ExchangeBoard
+          {...boardCopy(market)}
+          stocks={market === "KRX" ? filtered.krx : filtered.ngx}
           loading={loading}
           error={error}
           onRetry={() => void load()}

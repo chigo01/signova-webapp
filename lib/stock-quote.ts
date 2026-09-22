@@ -103,16 +103,17 @@ export async function fetchUsStockQuote(
   );
 }
 
-/** Nigerian Exchange quote. Does not fall through to US quote sources. */
-export async function fetchNgxQuote(
+/** Nigerian or Korean quote. Does not fall through to US quote sources. */
+export async function fetchMarketQuote(
   ticker: string,
+  market: "NGX" | "KRX",
 ): Promise<StockQuoteResult | null> {
   const t = ticker.trim().toUpperCase();
   if (!t) return null;
   try {
     const token = getAuthToken();
     const res = await fetch(
-      `${API_URL}/stocks/quote/${encodeURIComponent(t)}?market=ngx`,
+      `${API_URL}/stocks/quote/${encodeURIComponent(t)}?market=${market.toLowerCase()}`,
       {
         headers: {
           "Content-Type": "application/json",

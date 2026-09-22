@@ -1,4 +1,4 @@
-export type StockCurrency = "USD" | "NGN";
+export type StockCurrency = "USD" | "NGN" | "KRW";
 
 export function formatStockPrice(
   price: number,
@@ -11,6 +11,13 @@ export function formatStockPrice(
       currency: "NGN",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
+    }).format(price);
+  }
+  if (currency === "KRW") {
+    return new Intl.NumberFormat("ko-KR", {
+      style: "currency",
+      currency: "KRW",
+      maximumFractionDigits: 0,
     }).format(price);
   }
   return `$${price.toFixed(2)}`;
@@ -28,17 +35,25 @@ export function formatUsdMarketCapMillions(millions: number): string {
   return `$${millions.toFixed(0)}M`;
 }
 
-/** NGX market cap from the board feed is absolute naira. */
+/** Local board market cap is an absolute amount, not millions. */
+export function formatAbsoluteMarketCap(
+  value: number,
+  currency: "NGN" | "KRW",
+): string {
+  const mark = currency === "KRW" ? "₩" : "₦";
+  if (!Number.isFinite(value) || value <= 0) return "—";
+  if (value >= 1_000_000_000_000) {
+    return `${mark}${(value / 1_000_000_000_000).toFixed(2)}T`;
+  }
+  if (value >= 1_000_000_000) {
+    return `${mark}${(value / 1_000_000_000).toFixed(2)}B`;
+  }
+  if (value >= 1_000_000) {
+    return `${mark}${(value / 1_000_000).toFixed(2)}M`;
+  }
+  return formatStockPrice(value, currency);
+}
+
 export function formatNgnMarketCap(naira: number): string {
-  if (!Number.isFinite(naira) || naira <= 0) return "—";
-  if (naira >= 1_000_000_000_000) {
-    return `₦${(naira / 1_000_000_000_000).toFixed(2)}T`;
-  }
-  if (naira >= 1_000_000_000) {
-    return `₦${(naira / 1_000_000_000).toFixed(2)}B`;
-  }
-  if (naira >= 1_000_000) {
-    return `₦${(naira / 1_000_000).toFixed(2)}M`;
-  }
-  return formatStockPrice(naira, "NGN");
+  return formatAbsoluteMarketCap(naira, "NGN");
 }
