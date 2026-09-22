@@ -10,7 +10,7 @@ import { TopGainers } from "@/components/dashboard/stocks/top-gainers";
 import { RecommendationsGrid } from "@/components/dashboard/stocks/recommendations-grid";
 import { PersonalWatchlist } from "@/components/dashboard/stocks/personal-watchlist";
 import { NgxBoard } from "@/components/dashboard/stocks/ngx-board";
-import { isNgxTicker, stockDetailPath } from "@/lib/ngx";
+import { isNgxTicker, stockDetailPath, type StockMarket } from "@/lib/ngx";
 import {
   fetchStockRecommendations,
   fetchTopNews,
@@ -30,6 +30,13 @@ const emptyData: StockRecommendationsResponse = {
   ngx: [],
   lastUpdated: new Date().toISOString(),
 };
+
+const MARKET_STORAGE_KEY = "signova.stockMarket";
+
+function readStoredMarket(): StockMarket {
+  if (typeof window === "undefined") return "US";
+  return window.sessionStorage.getItem(MARKET_STORAGE_KEY) === "NGX" ? "NGX" : "US";
+}
 
 function filterStocks(
   list: StockRecommendation[],
@@ -56,6 +63,7 @@ export function StocksPageContent() {
   );
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [market, setMarket] = useState<StockMarket>(readStoredMarket);
   const [news, setNews] = useState<NewsArticle[]>(
     () => getStocksCache().news ?? []
   );
@@ -113,6 +121,11 @@ export function StocksPageContent() {
     setNewsLoading(false);
   }, []);
 
+  const chooseMarket = useCallback((next: StockMarket) => {
+    setMarket(next);
+    window.sessionStorage.setItem(MARKET_STORAGE_KEY, next);
+  }, []);
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const cache = getStocksCache();
@@ -153,53 +166,94 @@ export function StocksPageContent() {
     router.push(stockDetailPath(ticker, isNgxTicker(ticker) ? "NGX" : "US"));
   }, [data.ngx, data.topMovers, data.watchlist, router, searchQuery]);
 
+  const otherMarket =
+    searchQuery.trim() && market === "US" && filtered.ngx.length > 0 &&
+    filtered.watchlist.length === 0 &&
+    filtered.topMovers.length === 0
+      ? { next: "NGX" as const, label: "Show Nigeria" }
+      : searchQuery.trim() &&
+          market === "NGX" &&
+          filtered.ngx.length === 0 &&
+          (filtered.watchlist.length > 0 || filtered.topMovers.length > 0)
+        ? { next: "US" as const, label: "Show United States" }
+        : null;
+
   return (
     <div className="min-h-screen flex-1 overflow-y-auto overflow-x-hidden bg-black px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-white">Stock options</h1>
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-            <Input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  openTickerFromSearch();
-                }
-              }}
-              placeholder="Search symbol or name"
-              aria-label="Search stocks by symbol or company name"
-              className="w-64 border-0 bg-zinc-900 pl-10 text-white placeholder:text-zinc-500"
-            />
-          </div>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold text-white">Stock options</h1>
+          <select
+            id="stock-market"
+            value={market}
+            onChange={(event) =>
+              chooseMarket(event.target.value === "NGX" ? "NGX" : "US")
+            }
+            aria-label="Market"
+            className="h-9 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-sm text-white outline-none focus:border-zinc-500"
+          >
+            <option value="US">United States</option>
+            <option value="NGX">Nigeria</option>
+          </select>
+        </div>
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+          <Input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                openTickerFromSearch();
+              }
+            }}
+            placeholder="Search symbol or name"
+            aria-label="Search stocks by symbol or company name"
+            className="w-full border-0 bg-zinc-900 pl-10 text-white placeholder:text-zinc-500"
+          />
         </div>
       </div>
+      {otherMarket && (
+        <button
+          type="button"
+          onClick={() => chooseMarket(otherMarket.next)}
+          className="mb-4 text-sm text-zinc-300 underline-offset-2 hover:text-white hover:underline"
+        >
+          {otherMarket.label}
+        </button>
+      )}
 
       <PersonalWatchlist />
 
-      <section className="mb-8">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">AI Stock Signals</h2>
-          <span className="text-xs text-zinc-500">
-            {loading && !error
-              ? "Loading…"
-              : `Updated ${relativeTime(data.lastUpdated)}`}
-          </span>
-        </div>
-        <RecommendationsGrid
-          watchlist={filtered.watchlist}
-          topMovers={filtered.topMovers}
+      {market === "NGX" ? (
+        <NgxBoard
+          stocks={filtered.ngx}
           loading={loading}
           error={error}
           onRetry={() => void load()}
         />
-      </section>
+      ) : (
+        <section className="mb-8">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white">AI Stock Signals</h2>
+            <span className="text-xs text-zinc-500">
+              {loading && !error
+                ? "Loading…"
+                : `Updated ${relativeTime(data.lastUpdated)}`}
+            </span>
+          </div>
+          <RecommendationsGrid
+            watchlist={filtered.watchlist}
+            topMovers={filtered.topMovers}
+            loading={loading}
+            error={error}
+            onRetry={() => void load()}
+          />
+        </section>
+      )}
 
-      <NgxBoard stocks={filtered.ngx} loading={loading} error={error} />
-
+      {market === "US" && (
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="lg:col-span-4">
           <HeatMap watchlist={filtered.watchlist} loading={loading} />
@@ -211,6 +265,7 @@ export function StocksPageContent() {
           <TopGainers stocks={filtered.watchlist} />
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -9,6 +9,7 @@ interface Props {
   stocks: StockRecommendation[];
   loading?: boolean;
   error?: string | null;
+  onRetry?: () => void;
 }
 
 function NgxCard({ stock }: { stock: StockRecommendation }) {
@@ -60,9 +61,12 @@ function NgxCard({ stock }: { stock: StockRecommendation }) {
   );
 }
 
-export function NgxBoard({ stocks, loading = false, error = null }: Props) {
-  if (error && stocks.length === 0) return null;
-
+export function NgxBoard({
+  stocks,
+  loading = false,
+  error = null,
+  onRetry,
+}: Props) {
   return (
     <section className="mb-8">
       <div className="mb-4">
@@ -80,7 +84,20 @@ export function NgxBoard({ stocks, loading = false, error = null }: Props) {
         </div>
       ) : stocks.length === 0 ? (
         <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-4 py-10 text-center text-sm text-zinc-500">
-          Nigerian Exchange quotes are not in this feed yet.
+          <p>
+            {error
+              ? "Couldn’t load the Nigerian Exchange."
+              : "Nigerian Exchange quotes are not in this feed yet."}
+          </p>
+          {error && onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="mt-3 text-sm text-white underline-offset-2 hover:underline"
+            >
+              Retry
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
